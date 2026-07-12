@@ -26,6 +26,13 @@ type DeskPose = typeof DESK & { xM: number; yM: number };
 type DragPayload = { kind: "product"; id: string } | { kind: "instance"; id: string };
 type Ghost = { zone: Zone; xM: number; yM: number; widthM: number; depthM: number; valid: boolean };
 
+const stageItemBase =
+  "group absolute block cursor-grab origin-bottom border-0 bg-transparent p-0 transition-[filter] duration-150 active:cursor-grabbing motion-reduce:transition-none";
+const cyanHover =
+  "[filter:none] hover:[filter:drop-shadow(0_0_5px_rgba(85,220,255,0.7))] focus-visible:[filter:drop-shadow(0_0_5px_rgba(85,220,255,0.7))] focus-visible:outline-none";
+const floorShadow =
+  "[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))] hover:[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))_drop-shadow(0_0_5px_rgba(85,220,255,0.7))] focus-visible:[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))_drop-shadow(0_0_5px_rgba(85,220,255,0.7))] focus-visible:outline-none";
+
 function pointerToStage(event: { clientX: number; clientY: number }, stage: HTMLDivElement) {
   const rect = stage.getBoundingClientRect();
   return {
@@ -300,7 +307,7 @@ export function IsoStage() {
 
   const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as Element;
-    const startedOnItem = Boolean(target.closest(".stage-item"));
+    const startedOnItem = Boolean(target.closest("[data-stage-item]"));
     if (!startedOnItem && target.closest("button, input, [role='slider']")) return;
     const mousePan = event.button === 1 || (event.button === 0 && spacePressed.current);
     const touchPan = event.pointerType === "touch" && !startedOnItem;
@@ -333,14 +340,18 @@ export function IsoStage() {
   return (
     <div
       ref={viewportRef}
-      className="stage-viewport"
+      className="absolute inset-0 cursor-grab touch-none overflow-hidden overscroll-contain bg-[#202126] active:cursor-grabbing"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at 52% 44%, rgba(75, 80, 77, .18), transparent 45%)",
+      }}
       onPointerDown={beginPan}
       onPointerMove={movePan}
       onPointerUp={endPan}
       onPointerCancel={endPan}
     >
       <div
-        className="stage-shell"
+        className="absolute h-[800px] w-[1200px] origin-center will-change-transform"
         style={{
           left: `calc(50% + ${panX}px)`,
           top: `calc(50% + ${panY}px)`,
@@ -349,7 +360,7 @@ export function IsoStage() {
       >
         <div
           ref={stageRef}
-          className="stage"
+          className="relative isolate h-[800px] w-[1200px] touch-none select-none"
           onDragOver={handleDragOver}
           onDrop={(event) => {
             if (event.nativeEvent.cancelable) event.preventDefault();
@@ -420,14 +431,43 @@ export function IsoStage() {
 function RoomSurfaces({ desk }: { desk: DeskPose }) {
   return (
     <>
-      <div className="wall wall-left" />
-      <div className="wall wall-right" />
-      <div className="floor" />
       <div
-        className="desk-surface-plane"
+        className="absolute h-[432px] w-[800px] origin-top-left border-2 border-white/[0.035] bg-[#31322e]"
+        style={{
+          left: 600,
+          top: 420,
+          transform: "matrix(.5, .25, 0, -1, 0, 0)",
+          backgroundImage:
+            "radial-gradient(circle at 20% 30%, rgba(255,255,255,.025), transparent 35%), repeating-linear-gradient(90deg, transparent 0 79px, rgba(0,0,0,.07) 80px)",
+        }}
+      />
+      <div
+        className="absolute h-[432px] w-[640px] origin-top-left border-2 border-white/[0.035] bg-[#31322e]"
+        style={{
+          left: 600,
+          top: 420,
+          transform: "matrix(-.5, .25, 0, -1, 0, 0)",
+          backgroundImage:
+            "radial-gradient(circle at 20% 30%, rgba(255,255,255,.025), transparent 35%), repeating-linear-gradient(90deg, transparent 0 79px, rgba(0,0,0,.07) 80px)",
+        }}
+      />
+      <div
+        className="absolute h-[640px] w-[800px] origin-top-left bg-[#4b2e1e] shadow-[inset_0_0_0_2px_rgba(0,0,0,.25)]"
+        style={{
+          left: 600,
+          top: 420,
+          transform: "matrix(.5, .25, -.5, .25, 0, 0)",
+          backgroundImage:
+            "linear-gradient(90deg, rgba(20, 10, 5, .35) 2px, transparent 2px), linear-gradient(rgba(255, 220, 175, .08) 1px, transparent 1px), repeating-linear-gradient(0deg, #4b2e1e 0 78px, #70482f 79px 158px)",
+          backgroundSize: "160px 80px, 160px 80px, 160px 320px",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute h-[320px] w-[160px] origin-top-left"
         style={{
           left: projectFloor({ xM: desk.xM, yM: desk.yM, zM: desk.heightM }).x,
           top: projectFloor({ xM: desk.xM, yM: desk.yM, zM: desk.heightM }).y,
+          transform: "matrix(.5, .25, -.5, .25, 0, 0)",
         }}
       />
     </>
@@ -473,7 +513,8 @@ function DragPreview({
   const { point, world } = getItemPoint(product, ghost.xM, ghost.yM, desk);
   return (
     <div
-      className={`stage-item is-preview ${hasFloorShadow(product) ? "has-floor-shadow" : ""} ${ghost.valid ? "" : "is-invalid"}`}
+      data-stage-item
+      className={`${stageItemBase} pointer-events-none ${hasFloorShadow(product) ? "opacity-[.86] [filter:drop-shadow(0_18px_12px_rgba(0,0,0,0.5))_drop-shadow(0_0_5px_rgba(85,220,255,0.55))]" : "opacity-[.86] [filter:drop-shadow(0_0_5px_rgba(85,220,255,0.55))]"} ${ghost.valid ? "" : "opacity-45 [filter:grayscale(.45)_drop-shadow(0_0_7px_rgba(251,113,133,.8))]"}`}
       style={{
         left: point.x - product.anchorX,
         top: point.y - product.anchorY,
@@ -483,7 +524,12 @@ function DragPreview({
       }}
       aria-hidden="true"
     >
-      <img src={product.sprite} alt="" draggable={false} />
+      <img
+        className="pointer-events-none block size-full object-contain"
+        src={product.sprite}
+        alt=""
+        draggable={false}
+      />
     </div>
   );
 }
@@ -507,11 +553,12 @@ function StageItem({
   const { point, world } = getItemPoint(product, item.xM, item.yM, desk);
   return (
     <button
+      data-stage-item
       draggable
       onDragStart={(event) => onDragStart(event, { kind: "instance", id: item.instanceId })}
       onDragEnd={onDragEnd}
       onPointerDown={(event) => onPointerDown(event, { kind: "instance", id: item.instanceId })}
-      className={`stage-item ${hasFloorShadow(product) ? "has-floor-shadow" : ""} ${isDragging ? "is-dragging" : ""}`}
+      className={`${stageItemBase} ${hasFloorShadow(product) ? floorShadow : cyanHover} ${isDragging ? "opacity-0" : ""}`}
       style={{
         left: point.x - product.anchorX,
         top: point.y - product.anchorY,
@@ -521,8 +568,13 @@ function StageItem({
       }}
       aria-label={`${product.name}, ${product.variation}, ${product.widthM} by ${product.depthM} meters`}
     >
-      <img src={product.sprite} alt="" draggable={false} />
-      <span className="measurement-tag">
+      <img
+        className="pointer-events-none block size-full object-contain"
+        src={product.sprite}
+        alt=""
+        draggable={false}
+      />
+      <span className="absolute bottom-[-17px] left-1/2 -translate-x-1/2 rounded-full bg-[rgba(8,10,12,.82)] px-[7px] py-[3px] text-[9px] whitespace-nowrap text-white/60 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none">
         {product.widthM} × {product.depthM} m
       </span>
     </button>
