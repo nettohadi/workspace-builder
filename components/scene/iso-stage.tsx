@@ -68,6 +68,14 @@ export function IsoStage() {
   const [drag, setDrag] = useState<DragPayload | null>(null);
   const [ghost, setGhost] = useState<Ghost | null>(null);
   const pointerDrag = useRef<{ payload: DragPayload; pointerId: number } | null>(null);
+  const panDrag = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    panX: number;
+    panY: number;
+  } | null>(null);
+  const spacePressed = useRef(false);
   const grabOffset = useRef({ xM: 0, yM: 0 });
   const items = useBuildStore((state) => state.items);
   const addItem = useBuildStore((state) => state.addItem);
@@ -75,6 +83,10 @@ export function IsoStage() {
   const swapDesk = useBuildStore((state) => state.swapDesk);
   const zoom = useBuildStore((state) => state.zoom);
   const setZoom = useBuildStore((state) => state.setZoom);
+  const panX = useBuildStore((state) => state.panX);
+  const panY = useBuildStore((state) => state.panY);
+  const setPan = useBuildStore((state) => state.setPan);
+  const resetView = useBuildStore((state) => state.resetView);
   const desk = useMemo<DeskPose>(() => {
     const deskItem = items.find((item) => item.instanceId === "desk");
     return { ...DESK, xM: deskItem?.xM ?? 2.2, yM: deskItem?.yM ?? 0.85 };
@@ -100,13 +112,35 @@ export function IsoStage() {
     if (!viewport) return;
     const zoomStage = (event: WheelEvent) => {
       if (event.cancelable) event.preventDefault();
-      const currentZoom = useBuildStore.getState().zoom;
-      const sensitivity = event.ctrlKey ? 0.008 : 0.0015;
-      setZoom(currentZoom - event.deltaY * sensitivity);
+      const view = useBuildStore.getState();
+      if (event.ctrlKey || event.metaKey) {
+        setZoom(view.zoom - event.deltaY * 0.008);
+      } else {
+        setPan(view.panX - event.deltaX, view.panY - event.deltaY);
+      }
     };
     viewport.addEventListener("wheel", zoomStage, { passive: false });
     return () => viewport.removeEventListener("wheel", zoomStage);
-  }, [setZoom]);
+  }, [setPan, setZoom]);
+
+  useEffect(() => {
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Space" || event.repeat) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
+      spacePressed.current = true;
+      if (event.cancelable) event.preventDefault();
+    };
+    const keyUp = (event: KeyboardEvent) => {
+      if (event.code === "Space") spacePressed.current = false;
+    };
+    window.addEventListener("keydown", keyDown);
+    window.addEventListener("keyup", keyUp);
+    return () => {
+      window.removeEventListener("keydown", keyDown);
+      window.removeEventListener("keyup", keyUp);
+    };
+  }, []);
 
   useEffect(() => {
     const start = (event: Event) => {
@@ -221,6 +255,10 @@ export function IsoStage() {
   };
 
   const beginNativeDrag = (event: React.DragEvent, payload: DragPayload) => {
+    if (spacePressed.current) {
+      event.preventDefault();
+      return;
+    }
     captureGrabOffset(event.clientX, event.clientY, payload);
     setDrag(payload);
     event.dataTransfer.setData(
@@ -260,11 +298,54 @@ export function IsoStage() {
     endDrag();
   };
 
+  const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target as Element;
+    const startedOnItem = Boolean(target.closest(".stage-item"));
+    if (!startedOnItem && target.closest("button, input, [role='slider']")) return;
+    const mousePan = event.button === 1 || (event.button === 0 && spacePressed.current);
+    const touchPan = event.pointerType === "touch" && !startedOnItem;
+    const emptyCanvasPan = event.pointerType === "mouse" && event.button === 0 && !startedOnItem;
+    if (!mousePan && !touchPan && !emptyCanvasPan) return;
+    if (event.cancelable) event.preventDefault();
+    panDrag.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      panX,
+      panY,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const movePan = (event: React.PointerEvent<HTMLDivElement>) => {
+    const active = panDrag.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    setPan(
+      active.panX + event.clientX - active.startX,
+      active.panY + event.clientY - active.startY,
+    );
+  };
+
+  const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (panDrag.current?.pointerId === event.pointerId) panDrag.current = null;
+  };
+
   return (
-    <div ref={viewportRef} className="stage-viewport">
+    <div
+      ref={viewportRef}
+      className="stage-viewport"
+      onPointerDown={beginPan}
+      onPointerMove={movePan}
+      onPointerUp={endPan}
+      onPointerCancel={endPan}
+    >
       <div
         className="stage-shell"
-        style={{ transform: `translate(-50%, -50%) scale(${fitScale * zoom})` }}
+        style={{
+          left: `calc(50% + ${panX}px)`,
+          top: `calc(50% + ${panY}px)`,
+          transform: `translate(-50%, -50%) scale(${fitScale * zoom})`,
+        }}
       >
         <div
           ref={stageRef}
@@ -320,7 +401,7 @@ export function IsoStage() {
         <span className="w-11 text-center text-[11px] text-white/60 tabular-nums">
           {Math.round(zoom * 100)}%
         </span>
-        <Button aria-label="Reset zoom" variant="ghost" size="icon" onClick={() => setZoom(1)}>
+        <Button aria-label="Reset view" variant="ghost" size="icon" onClick={resetView}>
           <RotateCcw className="size-4" />
         </Button>
         <Button
@@ -373,6 +454,10 @@ function interactionPriority(product: Product) {
   return 0;
 }
 
+function hasFloorShadow(product: Product) {
+  return product.category === "desk" || product.category === "chair";
+}
+
 function DragPreview({
   drag,
   ghost,
@@ -388,7 +473,7 @@ function DragPreview({
   const { point, world } = getItemPoint(product, ghost.xM, ghost.yM, desk);
   return (
     <div
-      className={`stage-item is-preview ${ghost.valid ? "" : "is-invalid"}`}
+      className={`stage-item is-preview ${hasFloorShadow(product) ? "has-floor-shadow" : ""} ${ghost.valid ? "" : "is-invalid"}`}
       style={{
         left: point.x - product.anchorX,
         top: point.y - product.anchorY,
@@ -426,7 +511,7 @@ function StageItem({
       onDragStart={(event) => onDragStart(event, { kind: "instance", id: item.instanceId })}
       onDragEnd={onDragEnd}
       onPointerDown={(event) => onPointerDown(event, { kind: "instance", id: item.instanceId })}
-      className={`stage-item ${isDragging ? "is-dragging" : ""}`}
+      className={`stage-item ${hasFloorShadow(product) ? "has-floor-shadow" : ""} ${isDragging ? "is-dragging" : ""}`}
       style={{
         left: point.x - product.anchorX,
         top: point.y - product.anchorY,

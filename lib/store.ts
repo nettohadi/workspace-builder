@@ -12,7 +12,11 @@ export interface PlacedItem {
 interface BuildStore {
   items: PlacedItem[];
   zoom: number;
+  panX: number;
+  panY: number;
   setZoom: (zoom: number) => void;
+  setPan: (panX: number, panY: number) => void;
+  resetView: () => void;
   addItem: (item: PlacedItem) => void;
   moveItem: (instanceId: string, xM: number, yM: number) => void;
   swapDesk: (productId: string) => void;
@@ -29,7 +33,11 @@ const initialItems: PlacedItem[] = [
 export const useBuildStore = create<BuildStore>((set) => ({
   items: initialItems,
   zoom: 1,
-  setZoom: (zoom) => set({ zoom: Math.min(1.8, Math.max(0.6, zoom)) }),
+  panX: 0,
+  panY: 0,
+  setZoom: (zoom) => set({ zoom: Math.min(2.2, Math.max(0.6, zoom)) }),
+  setPan: (panX, panY) => set({ panX, panY }),
+  resetView: () => set({ zoom: 1, panX: 0, panY: 0 }),
   addItem: (item) => set((state) => ({ items: [...state.items, item] })),
   moveItem: (instanceId, xM, yM) =>
     set((state) => ({
