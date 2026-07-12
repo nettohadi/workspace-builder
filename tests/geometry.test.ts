@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { projectFloor, projectedFootprint, snapMeters, unprojectFloor } from "../lib/geometry";
+import {
+  anchoredFootprint,
+  projectFloor,
+  projectedFootprint,
+  snapMeters,
+  unprojectFloor,
+} from "../lib/geometry";
 
 describe("measured isometric geometry", () => {
   it("round-trips meter coordinates through screen space", () => {
@@ -16,5 +22,14 @@ describe("measured isometric geometry", () => {
   it("snaps floor positions to quarter-meter increments", () => {
     expect(snapMeters(1.13, 0.25)).toBe(1.25);
     expect(snapMeters(1.11, 0.25)).toBe(1);
+  });
+
+  it("offsets a footprint from its calibrated placement anchor", () => {
+    expect(anchoredFootprint(2.2, 0.85, 1, 2, 0.75, 0.75)).toEqual({
+      xM: 1.4500000000000002,
+      yM: 0.09999999999999998,
+      widthM: 1,
+      depthM: 2,
+    });
   });
 });

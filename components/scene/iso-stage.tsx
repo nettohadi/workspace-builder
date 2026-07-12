@@ -1,17 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Minus, Plus, RotateCcw } from "lucide-react";
+import { Minus, Plus, RotateCcw, Scan } from "lucide-react";
 import { PRODUCTS_BY_ID, type Product, type Zone } from "@/lib/catalog";
 import {
+  anchoredFootprint,
   clamp,
-  DESK_SNAP_METERS,
   depthKey,
-  FLOOR_SNAP_METERS,
   LOGICAL_PX_PER_METER,
   projectFloor,
   ROOM,
-  snapMeters,
   STAGE_HEIGHT,
   STAGE_WIDTH,
   unprojectFloor,
@@ -24,14 +22,27 @@ import { Slider } from "@/components/ui/slider";
 const DESK = { widthM: 1, depthM: 2, heightM: 0.75 };
 type DeskPose = typeof DESK & { xM: number; yM: number };
 type DragPayload = { kind: "product"; id: string } | { kind: "instance"; id: string };
-type Ghost = { zone: Zone; xM: number; yM: number; widthM: number; depthM: number; valid: boolean };
+type Ghost = {
+  zone: Zone;
+  xM: number;
+  yM: number;
+  footprintXM: number;
+  footprintYM: number;
+  widthM: number;
+  depthM: number;
+  valid: boolean;
+};
 
 const stageItemBase =
-  "group absolute block cursor-grab origin-bottom border-0 bg-transparent p-0 transition-[filter,transform] duration-200 active:cursor-grabbing motion-reduce:transition-none";
+  "group absolute block cursor-grab origin-bottom border-0 bg-transparent p-0 transition-[filter] duration-200 ease-out [will-change:filter] active:cursor-grabbing motion-reduce:transition-none motion-reduce:[will-change:auto]";
 const cyanHover =
   "[filter:none] hover:[filter:drop-shadow(0_0_5px_rgba(85,220,255,0.7))] focus-visible:[filter:drop-shadow(0_0_5px_rgba(85,220,255,0.7))] focus-visible:outline-none";
 const floorShadow =
   "[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))] hover:[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))_drop-shadow(0_0_5px_rgba(85,220,255,0.7))] focus-visible:[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))_drop-shadow(0_0_5px_rgba(85,220,255,0.7))] focus-visible:outline-none";
+const cyanSelected =
+  "[filter:drop-shadow(0_0_7px_rgba(85,220,255,0.9))] focus-visible:outline-none";
+const floorSelected =
+  "[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))_drop-shadow(0_0_7px_rgba(85,220,255,0.9))] focus-visible:outline-none";
 
 function pointerToStage(event: { clientX: number; clientY: number }, stage: HTMLDivElement) {
   const rect = stage.getBoundingClientRect();
@@ -42,10 +53,25 @@ function pointerToStage(event: { clientX: number; clientY: number }, stage: HTML
 }
 
 function footprintFor(product: Product) {
-  if (product.category === "desk" && product.zone === "floor") {
+  if (product.rotateFootprint) {
     return { widthM: product.depthM, depthM: product.widthM };
   }
   return { widthM: product.widthM, depthM: product.depthM };
+}
+
+function collisionFootprintFor(product: Product, xM: number, yM: number) {
+  const footprint = footprintFor(product);
+  return {
+    zone: product.zone,
+    ...anchoredFootprint(
+      xM,
+      yM,
+      footprint.widthM,
+      footprint.depthM,
+      product.footprintAnchorXM,
+      product.footprintAnchorYM,
+    ),
+  };
 }
 
 function overlaps(
@@ -70,8 +96,15 @@ function collidesWithPlacedItems(
     if (payload?.kind === "instance" && item.instanceId === payload.id) return false;
     if (item.zone !== candidate.zone) return false;
     const product = PRODUCTS_BY_ID[item.productId];
-    const footprint = footprintFor(product);
-    return overlaps(candidate, { ...item, ...footprint });
+    return overlaps(
+      {
+        xM: candidate.footprintXM,
+        yM: candidate.footprintYM,
+        widthM: candidate.widthM,
+        depthM: candidate.depthM,
+      },
+      collisionFootprintFor(product, item.xM, item.yM),
+    );
   });
 }
 
@@ -82,26 +115,46 @@ function candidateFor(
   grabOffset: { xM: number; yM: number },
 ): Ghost {
   if (product.zone === "desk") {
+    const footprint = footprintFor(product);
     const floor = unprojectFloor({ x: point.x, y: point.y + desk.heightM * LOGICAL_PX_PER_METER });
-    const rawXM = snapMeters(floor.xM - desk.xM - grabOffset.xM, DESK_SNAP_METERS);
-    const rawYM = snapMeters(floor.yM - desk.yM - grabOffset.yM, DESK_SNAP_METERS);
-    const maxXM = Math.max(0, desk.widthM - product.widthM);
-    const maxYM = Math.max(0, desk.depthM - product.depthM);
+    const rawXM = floor.xM - desk.xM - grabOffset.xM;
+    const rawYM = floor.yM - desk.yM - grabOffset.yM;
+    const maxXM = Math.max(0, desk.widthM - footprint.widthM);
+    const maxYM = Math.max(0, desk.depthM - footprint.depthM);
     const xM = clamp(rawXM, 0, maxXM);
     const yM = clamp(rawYM, 0, maxYM);
-    const valid = product.widthM <= desk.widthM && product.depthM <= desk.depthM;
-    return { zone: "desk", xM, yM, widthM: product.widthM, depthM: product.depthM, valid };
+    const valid = footprint.widthM <= desk.widthM && footprint.depthM <= desk.depthM;
+    return {
+      zone: "desk",
+      xM,
+      yM,
+      footprintXM: xM,
+      footprintYM: yM,
+      widthM: footprint.widthM,
+      depthM: footprint.depthM,
+      valid,
+    };
   }
   const floor = unprojectFloor(point);
   const footprint = footprintFor(product);
-  const rawXM = snapMeters(floor.xM - grabOffset.xM, FLOOR_SNAP_METERS);
-  const rawYM = snapMeters(floor.yM - grabOffset.yM, FLOOR_SNAP_METERS);
-  const maxXM = Math.max(0, ROOM.widthM - footprint.widthM);
-  const maxYM = Math.max(0, ROOM.depthM - footprint.depthM);
-  const xM = clamp(rawXM, 0, maxXM);
-  const yM = clamp(rawYM, 0, maxYM);
+  const anchorXM = product.footprintAnchorXM ?? 0;
+  const anchorYM = product.footprintAnchorYM ?? 0;
+  const rawXM = floor.xM - grabOffset.xM;
+  const rawYM = floor.yM - grabOffset.yM;
+  const maxXM = Math.max(anchorXM, ROOM.widthM - footprint.widthM + anchorXM);
+  const maxYM = Math.max(anchorYM, ROOM.depthM - footprint.depthM + anchorYM);
+  const xM = clamp(rawXM, anchorXM, maxXM);
+  const yM = clamp(rawYM, anchorYM, maxYM);
   const valid = footprint.widthM <= ROOM.widthM && footprint.depthM <= ROOM.depthM;
-  return { zone: product.zone, xM, yM, ...footprint, valid };
+  return {
+    zone: product.zone,
+    xM,
+    yM,
+    footprintXM: xM - anchorXM,
+    footprintYM: yM - anchorYM,
+    ...footprint,
+    valid,
+  };
 }
 
 export function IsoStage() {
@@ -110,8 +163,9 @@ export function IsoStage() {
   const [fitScale, setFitScale] = useState(1);
   const [drag, setDrag] = useState<DragPayload | null>(null);
   const [ghost, setGhost] = useState<Ghost | null>(null);
-  const [pressedId, setPressedId] = useState<string | null>(null);
-  const [settlingId, setSettlingId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showFootprints, setShowFootprints] = useState(false);
   const pointerDrag = useRef<{ payload: DragPayload; pointerId: number } | null>(null);
   const panDrag = useRef<{
     pointerId: number;
@@ -141,6 +195,9 @@ export function IsoStage() {
     const isDraggingDesk = drag?.kind === "instance" && drag.id === "desk";
     return isDraggingDesk && ghost ? { ...desk, xM: ghost.xM, yM: ghost.yM } : desk;
   }, [desk, drag, ghost]);
+  const stageScale = fitScale * zoom;
+  const inspectedItem = items.find((item) => item.instanceId === (hoveredId ?? selectedId));
+  const inspectedProduct = inspectedItem ? PRODUCTS_BY_ID[inspectedItem.productId] : null;
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -229,12 +286,15 @@ export function IsoStage() {
       const product = productForPayload(payload);
       if (!stage || !product) return;
       if (product.fixed && payload?.kind === "product") {
+        const footprint = collisionFootprintFor(product, desk.xM, desk.yM);
         setGhost({
           zone: "floor",
           xM: desk.xM,
           yM: desk.yM,
-          widthM: product.depthM,
-          depthM: product.widthM,
+          footprintXM: footprint.xM,
+          footprintYM: footprint.yM,
+          widthM: footprint.widthM,
+          depthM: footprint.depthM,
           valid: true,
         });
         return;
@@ -258,15 +318,6 @@ export function IsoStage() {
     },
     [desk, drag, items, productForPayload],
   );
-
-  const settleItem = useCallback((instanceId: string) => {
-    setSettlingId(instanceId);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setSettlingId((current) => (current === instanceId ? null : current));
-      });
-    });
-  }, []);
 
   const captureGrabOffset = useCallback(
     (clientX: number, clientY: number, payload: DragPayload) => {
@@ -303,7 +354,6 @@ export function IsoStage() {
       }
       if (payload.kind === "instance") {
         moveItem(payload.id, ghost.xM, ghost.yM);
-        settleItem(payload.id);
       } else {
         const instanceId = `${payload.id}-${crypto.randomUUID()}`;
         addItem({
@@ -313,10 +363,9 @@ export function IsoStage() {
           xM: ghost.xM,
           yM: ghost.yM,
         });
-        settleItem(instanceId);
       }
     },
-    [addItem, drag, ghost, moveItem, productForPayload, settleItem, swapDesk],
+    [addItem, drag, ghost, moveItem, productForPayload, swapDesk],
   );
 
   const handleDragOver = (event: React.DragEvent) => {
@@ -343,8 +392,6 @@ export function IsoStage() {
   };
 
   const endDrag = () => {
-    if (pressedId) settleItem(pressedId);
-    setPressedId(null);
     grabOffset.current = { xM: 0, yM: 0 };
     lastValidGhost.current = null;
     setDrag(null);
@@ -352,7 +399,6 @@ export function IsoStage() {
   };
 
   const beginPointerDrag = (event: React.PointerEvent, payload: DragPayload) => {
-    if (payload.kind === "instance") setPressedId(payload.id);
     if (event.pointerType === "mouse") return;
     captureGrabOffset(event.clientX, event.clientY, payload);
     pointerDrag.current = { payload, pointerId: event.pointerId };
@@ -367,11 +413,7 @@ export function IsoStage() {
   };
 
   const handlePointerUp = (event: React.PointerEvent) => {
-    if (pointerDrag.current?.pointerId !== event.pointerId) {
-      if (pressedId) settleItem(pressedId);
-      setPressedId(null);
-      return;
-    }
+    if (pointerDrag.current?.pointerId !== event.pointerId) return;
     commit(pointerDrag.current.payload);
     pointerDrag.current = null;
     endDrag();
@@ -381,6 +423,7 @@ export function IsoStage() {
     const target = event.target as Element;
     const startedOnItem = Boolean(target.closest("[data-stage-item]"));
     if (!startedOnItem && target.closest("button, input, [role='slider']")) return;
+    if (!startedOnItem) setSelectedId(null);
     const mousePan = event.button === 1 || (event.button === 0 && spacePressed.current);
     const touchPan = event.pointerType === "touch" && !startedOnItem;
     const emptyCanvasPan = event.pointerType === "mouse" && event.button === 0 && !startedOnItem;
@@ -423,16 +466,20 @@ export function IsoStage() {
       onPointerCancel={endPan}
     >
       <div
-        className="absolute h-[800px] w-[1200px] origin-center will-change-transform"
+        className="absolute"
         style={{
           left: `calc(50% + ${panX}px)`,
           top: `calc(50% + ${panY}px)`,
-          transform: `translate(-50%, -50%) scale(${fitScale * zoom})`,
         }}
       >
         <div
           ref={stageRef}
           className="relative isolate h-[800px] w-[1200px] touch-none select-none"
+          style={{
+            zoom: stageScale,
+            marginLeft: -STAGE_WIDTH / 2,
+            marginTop: -STAGE_HEIGHT / 2,
+          }}
           onDragOver={handleDragOver}
           onDrop={(event) => {
             if (event.nativeEvent.cancelable) event.preventDefault();
@@ -449,18 +496,12 @@ export function IsoStage() {
               item={item}
               desk={renderDesk}
               isDragging={drag?.kind === "instance" && drag.id === item.instanceId}
-              isPressed={pressedId === item.instanceId}
-              isCarried={
-                ((drag?.kind === "instance" && drag.id === "desk") || pressedId === "desk") &&
-                PRODUCTS_BY_ID[item.productId].zone === "desk"
-              }
-              isSettling={
-                settlingId === item.instanceId ||
-                (settlingId === "desk" && PRODUCTS_BY_ID[item.productId].zone === "desk")
-              }
+              isSelected={selectedId === item.instanceId}
               onDragStart={beginNativeDrag}
               onDragEnd={endDrag}
               onPointerDown={beginPointerDrag}
+              onSelect={setSelectedId}
+              onHover={setHoveredId}
             />
           ))}
           <DragPreview
@@ -469,8 +510,13 @@ export function IsoStage() {
             desk={renderDesk}
             product={productForPayload(drag)}
           />
+          {showFootprints && (
+            <FootprintDebug items={items} drag={drag} ghost={ghost} desk={renderDesk} />
+          )}
         </div>
       </div>
+
+      {inspectedProduct && <ItemDetails product={inspectedProduct} />}
 
       <div className="absolute right-4 bottom-5 flex items-center gap-2 rounded-full border border-white/10 bg-neutral-950/75 p-1.5 shadow-2xl backdrop-blur-xl md:right-6">
         <Button
@@ -490,12 +536,6 @@ export function IsoStage() {
           value={[zoom]}
           onValueChange={([value]) => setZoom(value)}
         />
-        <span className="w-11 text-center text-[11px] text-white/60 tabular-nums">
-          {Math.round(zoom * 100)}%
-        </span>
-        <Button aria-label="Reset view" variant="ghost" size="icon" onClick={resetView}>
-          <RotateCcw className="size-4" />
-        </Button>
         <Button
           aria-label="Zoom in"
           variant="ghost"
@@ -503,6 +543,23 @@ export function IsoStage() {
           onClick={() => setZoom(zoom + 0.1)}
         >
           <Plus className="size-4" />
+        </Button>
+        <span className="w-11 text-center text-[11px] text-white/60 tabular-nums">
+          {Math.round(zoom * 100)}%
+        </span>
+        <Button
+          aria-label="Show collision footprints"
+          aria-pressed={showFootprints}
+          title={showFootprints ? "Hide collision footprints" : "Show collision footprints"}
+          variant="ghost"
+          size="icon"
+          className={showFootprints ? "border-cyan-300/60 bg-cyan-300/15 text-cyan-200" : ""}
+          onClick={() => setShowFootprints((visible) => !visible)}
+        >
+          <Scan className="size-4" />
+        </Button>
+        <Button aria-label="Reset view" variant="ghost" size="icon" onClick={resetView}>
+          <RotateCcw className="size-4" />
         </Button>
       </div>
     </div>
@@ -557,8 +614,9 @@ function RoomSurfaces({ desk }: { desk: DeskPose }) {
 
 function getItemPoint(product: Product, xM: number, yM: number, desk: DeskPose) {
   const usesMeasuredCenter = product.category !== "desk";
-  const centerXM = usesMeasuredCenter ? product.widthM / 2 : 0;
-  const centerYM = usesMeasuredCenter ? product.depthM / 2 : 0;
+  const footprint = footprintFor(product);
+  const centerXM = usesMeasuredCenter ? footprint.widthM / 2 : 0;
+  const centerYM = usesMeasuredCenter ? footprint.depthM / 2 : 0;
   const world =
     product.zone === "desk"
       ? { xM: desk.xM + xM + centerXM, yM: desk.yM + yM + centerYM, zM: desk.heightM }
@@ -579,6 +637,81 @@ function hasFloorShadow(product: Product) {
   return product.category === "desk" || product.category === "chair";
 }
 
+function footprintPoints(
+  footprint: { zone: Zone; xM: number; yM: number; widthM: number; depthM: number },
+  desk: DeskPose,
+) {
+  const originXM = footprint.zone === "desk" ? desk.xM + footprint.xM : footprint.xM;
+  const originYM = footprint.zone === "desk" ? desk.yM + footprint.yM : footprint.yM;
+  const zM = footprint.zone === "desk" ? desk.heightM : 0;
+  return [
+    projectFloor({ xM: originXM, yM: originYM, zM }),
+    projectFloor({ xM: originXM + footprint.widthM, yM: originYM, zM }),
+    projectFloor({
+      xM: originXM + footprint.widthM,
+      yM: originYM + footprint.depthM,
+      zM,
+    }),
+    projectFloor({ xM: originXM, yM: originYM + footprint.depthM, zM }),
+  ]
+    .map((point) => `${point.x},${point.y}`)
+    .join(" ");
+}
+
+function FootprintDebug({
+  items,
+  drag,
+  ghost,
+  desk,
+}: {
+  items: PlacedItem[];
+  drag: DragPayload | null;
+  ghost: Ghost | null;
+  desk: DeskPose;
+}) {
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 z-[9000] size-full overflow-visible"
+      viewBox={`0 0 ${STAGE_WIDTH} ${STAGE_HEIGHT}`}
+      aria-hidden="true"
+    >
+      {items.map((item) => {
+        if (drag?.kind === "instance" && drag.id === item.instanceId) return null;
+        const product = PRODUCTS_BY_ID[item.productId];
+        const footprint = collisionFootprintFor(product, item.xM, item.yM);
+        return (
+          <polygon
+            key={item.instanceId}
+            points={footprintPoints(footprint, desk)}
+            className="fill-cyan-300/12 stroke-cyan-300"
+            strokeWidth="1.5"
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+      })}
+      {ghost && (
+        <polygon
+          points={footprintPoints(
+            {
+              zone: ghost.zone,
+              xM: ghost.footprintXM,
+              yM: ghost.footprintYM,
+              widthM: ghost.widthM,
+              depthM: ghost.depthM,
+            },
+            desk,
+          )}
+          className={
+            ghost.valid ? "fill-amber-300/18 stroke-amber-300" : "fill-red-400/20 stroke-red-400"
+          }
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+    </svg>
+  );
+}
+
 function DragPreview({
   drag,
   ghost,
@@ -595,7 +728,7 @@ function DragPreview({
   return (
     <div
       data-stage-item
-      className={`${stageItemBase} pointer-events-none -translate-y-2 ${hasFloorShadow(product) ? "opacity-[.86] [filter:drop-shadow(0_18px_12px_rgba(0,0,0,0.5))_drop-shadow(0_0_5px_rgba(85,220,255,0.55))]" : "opacity-[.86] [filter:drop-shadow(0_0_5px_rgba(85,220,255,0.55))]"} ${ghost.valid ? "" : "opacity-45 [filter:grayscale(.45)_drop-shadow(0_0_7px_rgba(251,113,133,.8))]"}`}
+      className={`${stageItemBase} pointer-events-none ${hasFloorShadow(product) ? "opacity-[.86] [filter:drop-shadow(0_18px_12px_rgba(0,0,0,0.5))_drop-shadow(0_0_5px_rgba(85,220,255,0.55))]" : "opacity-[.86] [filter:drop-shadow(0_0_5px_rgba(85,220,255,0.55))]"} ${ghost.valid ? "" : "opacity-45 [filter:grayscale(.45)_drop-shadow(0_0_7px_rgba(251,113,133,.8))]"}`}
       style={{
         left: point.x - product.anchorX,
         top: point.y - product.anchorY,
@@ -619,33 +752,45 @@ function StageItem({
   item,
   desk,
   isDragging,
-  isPressed,
-  isCarried,
-  isSettling,
+  isSelected,
   onDragStart,
   onDragEnd,
   onPointerDown,
+  onSelect,
+  onHover,
 }: {
   item: PlacedItem;
   desk: DeskPose;
   isDragging: boolean;
-  isPressed: boolean;
-  isCarried: boolean;
-  isSettling: boolean;
+  isSelected: boolean;
   onDragStart: (event: React.DragEvent, payload: DragPayload) => void;
   onDragEnd: () => void;
   onPointerDown: (event: React.PointerEvent, payload: DragPayload) => void;
+  onSelect: (instanceId: string) => void;
+  onHover: (instanceId: string | null) => void;
 }) {
   const product = PRODUCTS_BY_ID[item.productId];
   const { point, world } = getItemPoint(product, item.xM, item.yM, desk);
+  const itemShadow = isSelected
+    ? hasFloorShadow(product)
+      ? floorSelected
+      : cyanSelected
+    : hasFloorShadow(product)
+      ? floorShadow
+      : cyanHover;
   return (
     <button
       data-stage-item
       draggable
+      onClick={() => onSelect(item.instanceId)}
+      onMouseEnter={() => onHover(item.instanceId)}
+      onMouseLeave={() => onHover(null)}
+      onFocus={() => onHover(item.instanceId)}
+      onBlur={() => onHover(null)}
       onDragStart={(event) => onDragStart(event, { kind: "instance", id: item.instanceId })}
       onDragEnd={onDragEnd}
       onPointerDown={(event) => onPointerDown(event, { kind: "instance", id: item.instanceId })}
-      className={`${stageItemBase} ${hasFloorShadow(product) ? floorShadow : cyanHover} ${isDragging ? "opacity-0" : ""} ${isPressed || isCarried || isSettling ? "-translate-y-2" : "translate-y-0"}`}
+      className={`${stageItemBase} ${itemShadow} ${isDragging ? "opacity-0" : ""}`}
       style={{
         left: point.x - product.anchorX,
         top: point.y - product.anchorY,
@@ -661,9 +806,30 @@ function StageItem({
         alt=""
         draggable={false}
       />
-      <span className="absolute bottom-[-17px] left-1/2 -translate-x-1/2 rounded-full bg-[rgba(8,10,12,.82)] px-[7px] py-[3px] text-[9px] whitespace-nowrap text-white/60 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none">
-        {product.widthM} × {product.depthM} m
-      </span>
     </button>
+  );
+}
+
+function ItemDetails({ product }: { product: Product }) {
+  return (
+    <aside className="pointer-events-none absolute top-4 right-4 w-75 rounded-md border border-white/10 bg-neutral-950/85 p-3 shadow-2xl backdrop-blur-xl md:right-6">
+      <div className="flex items-center gap-3">
+        <div className="grid size-16 shrink-0 place-items-center rounded-md bg-gray-300 p-1.5">
+          <img
+            className="max-h-full max-w-full object-contain"
+            src={product.sprite}
+            alt=""
+            draggable={false}
+          />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-white">{product.name}</p>
+          <p className="mt-0.5 text-xs text-white/45">{product.variation}</p>
+          <p className="mt-2 text-[11px] text-white/65 tabular-nums">
+            {product.widthM} × {product.depthM} × {product.heightM} m
+          </p>
+        </div>
+      </div>
+    </aside>
   );
 }

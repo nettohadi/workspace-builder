@@ -37,6 +37,17 @@ export function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+export function anchoredFootprint(
+  xM: number,
+  yM: number,
+  widthM: number,
+  depthM: number,
+  anchorXM = 0,
+  anchorYM = 0,
+) {
+  return { xM: xM - anchorXM, yM: yM - anchorYM, widthM, depthM };
+}
+
 export function projectedFootprint(widthM: number, depthM: number) {
   return {
     width: (widthM + depthM) * 80,

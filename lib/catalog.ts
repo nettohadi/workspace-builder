@@ -16,6 +16,9 @@ export interface Product {
   displayHeight: number;
   anchorX: number;
   anchorY: number;
+  footprintAnchorXM?: number;
+  footprintAnchorYM?: number;
+  rotateFootprint?: boolean;
   fixed?: boolean;
 }
 
@@ -37,6 +40,9 @@ export const PRODUCTS: Product[] = [
     displayHeight: 245,
     anchorX: 211,
     anchorY: 147,
+    footprintAnchorXM: 0.75,
+    footprintAnchorYM: 0.75,
+    rotateFootprint: true,
     fixed: true,
   }),
   product({
@@ -54,6 +60,9 @@ export const PRODUCTS: Product[] = [
     displayHeight: 245,
     anchorX: 211,
     anchorY: 147,
+    footprintAnchorXM: 0.75,
+    footprintAnchorYM: 0.75,
+    rotateFootprint: true,
     fixed: true,
   }),
   product({
@@ -71,6 +80,7 @@ export const PRODUCTS: Product[] = [
     displayHeight: 116,
     anchorX: 63,
     anchorY: 108,
+    rotateFootprint: true,
   }),
   product({
     id: "monitor-white",
@@ -87,6 +97,7 @@ export const PRODUCTS: Product[] = [
     displayHeight: 116,
     anchorX: 63,
     anchorY: 108,
+    rotateFootprint: true,
   }),
   product({
     id: "chair-mesh",
@@ -135,6 +146,7 @@ export const PRODUCTS: Product[] = [
     displayHeight: 29,
     anchorX: 19,
     anchorY: 22,
+    rotateFootprint: true,
   }),
   product({
     id: "mouse-sand",
@@ -151,6 +163,7 @@ export const PRODUCTS: Product[] = [
     displayHeight: 29,
     anchorX: 19,
     anchorY: 22,
+    rotateFootprint: true,
   }),
   product({
     id: "keyboard-black",
@@ -167,6 +180,7 @@ export const PRODUCTS: Product[] = [
     displayHeight: 48,
     anchorX: 44,
     anchorY: 38,
+    rotateFootprint: true,
   }),
   product({
     id: "keyboard-white",
@@ -183,6 +197,7 @@ export const PRODUCTS: Product[] = [
     displayHeight: 48,
     anchorX: 44,
     anchorY: 38,
+    rotateFootprint: true,
   }),
   product({
     id: "headphones-blue",
