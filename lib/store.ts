@@ -24,9 +24,9 @@ interface BuildStore {
 
 const initialItems: PlacedItem[] = [
   { instanceId: "desk", productId: "desk-graphite", zone: "floor", xM: 2.2, yM: 0.85 },
-  { instanceId: "monitor-1", productId: "monitor-black", zone: "desk", xM: 0.18, yM: 0.75 },
-  { instanceId: "chair-1", productId: "chair-mesh", zone: "floor", xM: 2.35, yM: 2.2 },
-  { instanceId: "keyboard-1", productId: "keyboard-black", zone: "desk", xM: 0.38, yM: 0.65 },
+  { instanceId: "monitor-1", productId: "monitor-black", zone: "desk", xM: 0.18, yM: 0.2 },
+  { instanceId: "chair-1", productId: "chair-mesh", zone: "floor", xM: 2.35, yM: 3 },
+  { instanceId: "keyboard-1", productId: "keyboard-black", zone: "desk", xM: 0.38, yM: 0.9 },
   { instanceId: "mouse-1", productId: "mouse-black", zone: "desk", xM: 0.75, yM: 1.25 },
 ];
 

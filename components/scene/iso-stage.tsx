@@ -27,7 +27,7 @@ type DragPayload = { kind: "product"; id: string } | { kind: "instance"; id: str
 type Ghost = { zone: Zone; xM: number; yM: number; widthM: number; depthM: number; valid: boolean };
 
 const stageItemBase =
-  "group absolute block cursor-grab origin-bottom border-0 bg-transparent p-0 transition-[filter] duration-150 active:cursor-grabbing motion-reduce:transition-none";
+  "group absolute block cursor-grab origin-bottom border-0 bg-transparent p-0 transition-[filter,transform] duration-200 active:cursor-grabbing motion-reduce:transition-none";
 const cyanHover =
   "[filter:none] hover:[filter:drop-shadow(0_0_5px_rgba(85,220,255,0.7))] focus-visible:[filter:drop-shadow(0_0_5px_rgba(85,220,255,0.7))] focus-visible:outline-none";
 const floorShadow =
@@ -39,6 +39,40 @@ function pointerToStage(event: { clientX: number; clientY: number }, stage: HTML
     x: ((event.clientX - rect.left) * STAGE_WIDTH) / rect.width,
     y: ((event.clientY - rect.top) * STAGE_HEIGHT) / rect.height,
   };
+}
+
+function footprintFor(product: Product) {
+  if (product.category === "desk" && product.zone === "floor") {
+    return { widthM: product.depthM, depthM: product.widthM };
+  }
+  return { widthM: product.widthM, depthM: product.depthM };
+}
+
+function overlaps(
+  first: { xM: number; yM: number; widthM: number; depthM: number },
+  second: { xM: number; yM: number; widthM: number; depthM: number },
+) {
+  const epsilon = 0.0001;
+  return (
+    first.xM < second.xM + second.widthM - epsilon &&
+    first.xM + first.widthM > second.xM + epsilon &&
+    first.yM < second.yM + second.depthM - epsilon &&
+    first.yM + first.depthM > second.yM + epsilon
+  );
+}
+
+function collidesWithPlacedItems(
+  candidate: Ghost,
+  payload: DragPayload | null,
+  items: PlacedItem[],
+) {
+  return items.some((item) => {
+    if (payload?.kind === "instance" && item.instanceId === payload.id) return false;
+    if (item.zone !== candidate.zone) return false;
+    const product = PRODUCTS_BY_ID[item.productId];
+    const footprint = footprintFor(product);
+    return overlaps(candidate, { ...item, ...footprint });
+  });
 }
 
 function candidateFor(
@@ -59,13 +93,15 @@ function candidateFor(
     return { zone: "desk", xM, yM, widthM: product.widthM, depthM: product.depthM, valid };
   }
   const floor = unprojectFloor(point);
-  const xM = snapMeters(floor.xM - grabOffset.xM, FLOOR_SNAP_METERS);
-  const yM = snapMeters(floor.yM - grabOffset.yM, FLOOR_SNAP_METERS);
-  const footprintXM = product.category === "desk" ? product.depthM : product.widthM;
-  const footprintYM = product.category === "desk" ? product.widthM : product.depthM;
-  const valid =
-    xM >= 0 && yM >= 0 && xM + footprintXM <= ROOM.widthM && yM + footprintYM <= ROOM.depthM;
-  return { zone: product.zone, xM, yM, widthM: footprintXM, depthM: footprintYM, valid };
+  const footprint = footprintFor(product);
+  const rawXM = snapMeters(floor.xM - grabOffset.xM, FLOOR_SNAP_METERS);
+  const rawYM = snapMeters(floor.yM - grabOffset.yM, FLOOR_SNAP_METERS);
+  const maxXM = Math.max(0, ROOM.widthM - footprint.widthM);
+  const maxYM = Math.max(0, ROOM.depthM - footprint.depthM);
+  const xM = clamp(rawXM, 0, maxXM);
+  const yM = clamp(rawYM, 0, maxYM);
+  const valid = footprint.widthM <= ROOM.widthM && footprint.depthM <= ROOM.depthM;
+  return { zone: product.zone, xM, yM, ...footprint, valid };
 }
 
 export function IsoStage() {
@@ -74,6 +110,8 @@ export function IsoStage() {
   const [fitScale, setFitScale] = useState(1);
   const [drag, setDrag] = useState<DragPayload | null>(null);
   const [ghost, setGhost] = useState<Ghost | null>(null);
+  const [pressedId, setPressedId] = useState<string | null>(null);
+  const [settlingId, setSettlingId] = useState<string | null>(null);
   const pointerDrag = useRef<{ payload: DragPayload; pointerId: number } | null>(null);
   const panDrag = useRef<{
     pointerId: number;
@@ -84,6 +122,7 @@ export function IsoStage() {
   } | null>(null);
   const spacePressed = useRef(false);
   const grabOffset = useRef({ xM: 0, yM: 0 });
+  const lastValidGhost = useRef<Ghost | null>(null);
   const items = useBuildStore((state) => state.items);
   const addItem = useBuildStore((state) => state.addItem);
   const moveItem = useBuildStore((state) => state.moveItem);
@@ -152,10 +191,12 @@ export function IsoStage() {
   useEffect(() => {
     const start = (event: Event) => {
       grabOffset.current = { xM: 0, yM: 0 };
+      lastValidGhost.current = null;
       setDrag((event as CustomEvent<DragPayload>).detail);
     };
     const end = () => {
       grabOffset.current = { xM: 0, yM: 0 };
+      lastValidGhost.current = null;
       setDrag(null);
       setGhost(null);
     };
@@ -198,17 +239,34 @@ export function IsoStage() {
         });
         return;
       }
-      setGhost(
-        candidateFor(
-          product,
-          pointerToStage({ clientX, clientY }, stage),
-          desk,
-          grabOffset.current,
-        ),
+      const candidate = candidateFor(
+        product,
+        pointerToStage({ clientX, clientY }, stage),
+        desk,
+        grabOffset.current,
       );
+      const valid = candidate.valid && !collidesWithPlacedItems(candidate, payload, items);
+      if (valid) {
+        const next = { ...candidate, valid: true };
+        lastValidGhost.current = next;
+        setGhost(next);
+      } else if (lastValidGhost.current) {
+        setGhost(lastValidGhost.current);
+      } else {
+        setGhost({ ...candidate, valid: false });
+      }
     },
-    [desk, drag, productForPayload],
+    [desk, drag, items, productForPayload],
   );
+
+  const settleItem = useCallback((instanceId: string) => {
+    setSettlingId(instanceId);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setSettlingId((current) => (current === instanceId ? null : current));
+      });
+    });
+  }, []);
 
   const captureGrabOffset = useCallback(
     (clientX: number, clientY: number, payload: DragPayload) => {
@@ -243,17 +301,22 @@ export function IsoStage() {
         swapDesk(product.id);
         return;
       }
-      if (payload.kind === "instance") moveItem(payload.id, ghost.xM, ghost.yM);
-      else
+      if (payload.kind === "instance") {
+        moveItem(payload.id, ghost.xM, ghost.yM);
+        settleItem(payload.id);
+      } else {
+        const instanceId = `${payload.id}-${crypto.randomUUID()}`;
         addItem({
-          instanceId: `${payload.id}-${crypto.randomUUID()}`,
+          instanceId,
           productId: payload.id,
           zone: product.zone,
           xM: ghost.xM,
           yM: ghost.yM,
         });
+        settleItem(instanceId);
+      }
     },
-    [addItem, drag, ghost, moveItem, productForPayload, swapDesk],
+    [addItem, drag, ghost, moveItem, productForPayload, settleItem, swapDesk],
   );
 
   const handleDragOver = (event: React.DragEvent) => {
@@ -267,6 +330,7 @@ export function IsoStage() {
       return;
     }
     captureGrabOffset(event.clientX, event.clientY, payload);
+    lastValidGhost.current = null;
     setDrag(payload);
     event.dataTransfer.setData(
       payload.kind === "instance" ? "application/x-monis-instance" : "application/x-monis-product",
@@ -279,12 +343,16 @@ export function IsoStage() {
   };
 
   const endDrag = () => {
+    if (pressedId) settleItem(pressedId);
+    setPressedId(null);
     grabOffset.current = { xM: 0, yM: 0 };
+    lastValidGhost.current = null;
     setDrag(null);
     setGhost(null);
   };
 
   const beginPointerDrag = (event: React.PointerEvent, payload: DragPayload) => {
+    if (payload.kind === "instance") setPressedId(payload.id);
     if (event.pointerType === "mouse") return;
     captureGrabOffset(event.clientX, event.clientY, payload);
     pointerDrag.current = { payload, pointerId: event.pointerId };
@@ -299,7 +367,11 @@ export function IsoStage() {
   };
 
   const handlePointerUp = (event: React.PointerEvent) => {
-    if (pointerDrag.current?.pointerId !== event.pointerId) return;
+    if (pointerDrag.current?.pointerId !== event.pointerId) {
+      if (pressedId) settleItem(pressedId);
+      setPressedId(null);
+      return;
+    }
     commit(pointerDrag.current.payload);
     pointerDrag.current = null;
     endDrag();
@@ -377,6 +449,15 @@ export function IsoStage() {
               item={item}
               desk={renderDesk}
               isDragging={drag?.kind === "instance" && drag.id === item.instanceId}
+              isPressed={pressedId === item.instanceId}
+              isCarried={
+                ((drag?.kind === "instance" && drag.id === "desk") || pressedId === "desk") &&
+                PRODUCTS_BY_ID[item.productId].zone === "desk"
+              }
+              isSettling={
+                settlingId === item.instanceId ||
+                (settlingId === "desk" && PRODUCTS_BY_ID[item.productId].zone === "desk")
+              }
               onDragStart={beginNativeDrag}
               onDragEnd={endDrag}
               onPointerDown={beginPointerDrag}
@@ -514,7 +595,7 @@ function DragPreview({
   return (
     <div
       data-stage-item
-      className={`${stageItemBase} pointer-events-none ${hasFloorShadow(product) ? "opacity-[.86] [filter:drop-shadow(0_18px_12px_rgba(0,0,0,0.5))_drop-shadow(0_0_5px_rgba(85,220,255,0.55))]" : "opacity-[.86] [filter:drop-shadow(0_0_5px_rgba(85,220,255,0.55))]"} ${ghost.valid ? "" : "opacity-45 [filter:grayscale(.45)_drop-shadow(0_0_7px_rgba(251,113,133,.8))]"}`}
+      className={`${stageItemBase} pointer-events-none -translate-y-2 ${hasFloorShadow(product) ? "opacity-[.86] [filter:drop-shadow(0_18px_12px_rgba(0,0,0,0.5))_drop-shadow(0_0_5px_rgba(85,220,255,0.55))]" : "opacity-[.86] [filter:drop-shadow(0_0_5px_rgba(85,220,255,0.55))]"} ${ghost.valid ? "" : "opacity-45 [filter:grayscale(.45)_drop-shadow(0_0_7px_rgba(251,113,133,.8))]"}`}
       style={{
         left: point.x - product.anchorX,
         top: point.y - product.anchorY,
@@ -538,6 +619,9 @@ function StageItem({
   item,
   desk,
   isDragging,
+  isPressed,
+  isCarried,
+  isSettling,
   onDragStart,
   onDragEnd,
   onPointerDown,
@@ -545,6 +629,9 @@ function StageItem({
   item: PlacedItem;
   desk: DeskPose;
   isDragging: boolean;
+  isPressed: boolean;
+  isCarried: boolean;
+  isSettling: boolean;
   onDragStart: (event: React.DragEvent, payload: DragPayload) => void;
   onDragEnd: () => void;
   onPointerDown: (event: React.PointerEvent, payload: DragPayload) => void;
@@ -558,7 +645,7 @@ function StageItem({
       onDragStart={(event) => onDragStart(event, { kind: "instance", id: item.instanceId })}
       onDragEnd={onDragEnd}
       onPointerDown={(event) => onPointerDown(event, { kind: "instance", id: item.instanceId })}
-      className={`${stageItemBase} ${hasFloorShadow(product) ? floorShadow : cyanHover} ${isDragging ? "opacity-0" : ""}`}
+      className={`${stageItemBase} ${hasFloorShadow(product) ? floorShadow : cyanHover} ${isDragging ? "opacity-0" : ""} ${isPressed || isCarried || isSettling ? "-translate-y-2" : "translate-y-0"}`}
       style={{
         left: point.x - product.anchorX,
         top: point.y - product.anchorY,
