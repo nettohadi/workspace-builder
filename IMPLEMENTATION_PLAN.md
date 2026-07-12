@@ -233,7 +233,7 @@ Only install shadcn components when a concrete feature needs them. This keeps th
 Separate catalog definitions from placed instances:
 
 ```ts
-type Zone = 'desk' | 'floor';
+type Zone = "desk" | "floor";
 type DurationWeeks = 1 | 4 | 12;
 
 interface PlacedItem {
@@ -346,7 +346,7 @@ const LOGICAL_PX_PER_METER = 160;
 For untransformed floor and wall source planes, one square meter is `160 × 160` logical pixels. The floor's CSS projection maps each one-meter axis to screen-space vectors:
 
 ```ts
-const floorAxisX = { x: 80, y: 40 };  // +1 meter on the first floor axis
+const floorAxisX = { x: 80, y: 40 }; // +1 meter on the first floor axis
 const floorAxisY = { x: -80, y: 40 }; // +1 meter on the second floor axis
 const verticalAxis = { x: 0, y: -160 };
 ```
@@ -412,17 +412,11 @@ The desk's visual sprite is positioned by its calibrated contact anchor over thi
 Desk-surface items use a local meter-based coordinate system whose origin is the desk-top corner. For a desk height of `0.75 m`, project the local desk coordinate and then lift it vertically:
 
 ```ts
-const topOrigin = add(
-  projectFloor(desk.xM, desk.yM),
-  scale(verticalAxis, 0.75),
-);
+const topOrigin = add(projectFloor(desk.xM, desk.yM), scale(verticalAxis, 0.75));
 
 const itemPoint = add(
   topOrigin,
-  add(
-    scale(floorAxisX, item.localXM),
-    scale(floorAxisY, item.localYM),
-  ),
+  add(scale(floorAxisX, item.localXM), scale(floorAxisY, item.localYM)),
 );
 ```
 
@@ -510,15 +504,15 @@ This produces 14 approved transparent sprites. Generate at least three candidate
 
 Define real measurements before generating each asset. Initial measurement targets may use:
 
-| Category | Width | Depth | Height | Zone |
-|---|---:|---:|---:|---|
-| Desk | 2.00 m | 1.00 m | 0.75 m | Fixed floor anchor |
-| Monitor | 0.62 m | 0.22 m | 0.48 m | Desk surface |
-| Chair | 0.70 m | 0.70 m | 1.15 m | Floor |
-| Mouse | 0.07 m | 0.12 m | 0.04 m | Desk surface |
-| Keyboard | 0.44 m | 0.14 m | 0.03 m | Desk surface |
-| Headphones on stand | 0.20 m | 0.20 m | 0.32 m | Desk surface |
-| Floor plant | 0.45 m | 0.45 m | 1.10 m | Floor |
+| Category            |  Width |  Depth | Height | Zone               |
+| ------------------- | -----: | -----: | -----: | ------------------ |
+| Desk                | 2.00 m | 1.00 m | 0.75 m | Fixed floor anchor |
+| Monitor             | 0.62 m | 0.22 m | 0.48 m | Desk surface       |
+| Chair               | 0.70 m | 0.70 m | 1.15 m | Floor              |
+| Mouse               | 0.07 m | 0.12 m | 0.04 m | Desk surface       |
+| Keyboard            | 0.44 m | 0.14 m | 0.03 m | Desk surface       |
+| Headphones on stand | 0.20 m | 0.20 m | 0.32 m | Desk surface       |
+| Floor plant         | 0.45 m | 0.45 m | 1.10 m | Floor              |
 
 Measurements must be adjusted when a selected design is materially different. Product data, collision footprints, and usable desk space must use those measurements rather than the PNG bounds.
 
@@ -638,7 +632,7 @@ interface SharedBuildV1 {
   v: 1;
   i: PlacedItem[];
   d: DurationWeeks;
-  s: BuildState['surfaces'];
+  s: BuildState["surfaces"];
 }
 ```
 

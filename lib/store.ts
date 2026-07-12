@@ -31,9 +31,19 @@ export const useBuildStore = create<BuildStore>((set) => ({
   zoom: 1,
   setZoom: (zoom) => set({ zoom: Math.min(1.8, Math.max(0.6, zoom)) }),
   addItem: (item) => set((state) => ({ items: [...state.items, item] })),
-  moveItem: (instanceId, xM, yM) => set((state) => ({ items: state.items.map((item) => item.instanceId === instanceId ? { ...item, xM, yM } : item) })),
-  swapDesk: (productId) => set((state) => {
-    if (PRODUCTS_BY_ID[productId]?.category !== "desk") return state;
-    return { items: state.items.map((item) => item.instanceId === "desk" ? { ...item, productId } : item) };
-  }),
+  moveItem: (instanceId, xM, yM) =>
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.instanceId === instanceId ? { ...item, xM, yM } : item,
+      ),
+    })),
+  swapDesk: (productId) =>
+    set((state) => {
+      if (PRODUCTS_BY_ID[productId]?.category !== "desk") return state;
+      return {
+        items: state.items.map((item) =>
+          item.instanceId === "desk" ? { ...item, productId } : item,
+        ),
+      };
+    }),
 }));
