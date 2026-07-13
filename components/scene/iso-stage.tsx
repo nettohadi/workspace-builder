@@ -199,6 +199,8 @@ export function IsoStage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showFootprints, setShowFootprints] = useState(false);
   const pointerDrag = useRef<{ payload: DragPayload; pointerId: number } | null>(null);
+  const touchPointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ distance: number; zoom: number } | null>(null);
   const panDrag = useRef<{
     pointerId: number;
     startX: number;
@@ -529,6 +531,50 @@ export function IsoStage() {
     if (panDrag.current?.pointerId === event.pointerId) panDrag.current = null;
   };
 
+  const handleViewportPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "touch") {
+      touchPointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+      if (touchPointers.current.size === 2) {
+        const [first, second] = [...touchPointers.current.values()];
+        pinch.current = {
+          distance: Math.hypot(second.x - first.x, second.y - first.y),
+          zoom: useBuildStore.getState().zoom,
+        };
+        pointerDrag.current = null;
+        panDrag.current = null;
+        endDrag();
+        if (event.cancelable) event.preventDefault();
+        return;
+      }
+    }
+    beginPan(event);
+  };
+
+  const handleViewportPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "touch" && touchPointers.current.has(event.pointerId)) {
+      touchPointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pinch.current && touchPointers.current.size >= 2) {
+        const [first, second] = [...touchPointers.current.values()];
+        const distance = Math.hypot(second.x - first.x, second.y - first.y);
+        if (pinch.current.distance > 0) {
+          setZoom(pinch.current.zoom * (distance / pinch.current.distance));
+        }
+        if (event.cancelable) event.preventDefault();
+        return;
+      }
+    }
+    movePan(event);
+  };
+
+  const handleViewportPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "touch") {
+      touchPointers.current.delete(event.pointerId);
+      if (touchPointers.current.size < 2) pinch.current = null;
+    }
+    endPan(event);
+  };
+
   return (
     <div
       ref={viewportRef}
@@ -537,10 +583,10 @@ export function IsoStage() {
         backgroundImage:
           "radial-gradient(circle at 52% 44%, rgba(75, 80, 77, .18), transparent 45%)",
       }}
-      onPointerDown={beginPan}
-      onPointerMove={movePan}
-      onPointerUp={endPan}
-      onPointerCancel={endPan}
+      onPointerDown={handleViewportPointerDown}
+      onPointerMove={handleViewportPointerMove}
+      onPointerUp={handleViewportPointerEnd}
+      onPointerCancel={handleViewportPointerEnd}
     >
       <div
         className="absolute"

@@ -2,6 +2,8 @@
 
 ![Workspace Builder preview](./public/preview/preview.png)
 
+[Vercel Live Preview](https://workspace-builder-five.vercel.app/)
+
 An interactive isometric workspace planner built with Next.js, React, Tailwind CSS, and Zustand.
 
 ## Prerequisites
