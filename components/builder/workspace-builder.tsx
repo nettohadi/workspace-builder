@@ -5,6 +5,7 @@ import { Box, Ruler, Sparkles } from "lucide-react";
 import { PRODUCTS, PRODUCTS_BY_ID, type Category, type Product } from "@/lib/catalog";
 import { useBuildStore } from "@/lib/store";
 import { IsoStage } from "@/components/scene/iso-stage";
+import { CheckoutModal } from "@/components/builder/checkout-modal";
 
 const readyProductIds = new Set([
   "floor-oak",
@@ -120,6 +121,7 @@ function placementFor(product: Product, categoryCount: number) {
 export function WorkspaceBuilder() {
   const [category, setCategory] = useState<Category>("monitor");
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const items = useBuildStore((state) => state.items);
   const addItem = useBuildStore((state) => state.addItem);
   const swapDesk = useBuildStore((state) => state.swapDesk);
@@ -141,7 +143,7 @@ export function WorkspaceBuilder() {
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
-    setIsHydrated(true);
+    const hydrationFrame = requestAnimationFrame(() => setIsHydrated(true));
 
     let timer: ReturnType<typeof setTimeout> | undefined;
     const unsubscribe = useBuildStore.subscribe((state) => {
@@ -153,6 +155,7 @@ export function WorkspaceBuilder() {
 
     return () => {
       clearTimeout(timer);
+      cancelAnimationFrame(hydrationFrame);
       unsubscribe();
     };
   }, []);
@@ -240,7 +243,7 @@ export function WorkspaceBuilder() {
               </button>
             ))}
           </nav>
-          <div className="hidden min-h-0 flex-1 grid-cols-2 gap-3 overflow-y-auto overscroll-contain px-4 pt-3 pb-5 md:grid md:content-start">
+          <div className="hidden min-h-0 flex-1 [scrollbar-width:thin] [scrollbar-color:rgb(251_146_60)_rgba(255,255,255,0.08)] grid-cols-2 gap-3 overflow-y-auto overscroll-contain px-4 pt-3 pb-5 md:grid md:content-start [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-orange-400 [&::-webkit-scrollbar-track]:bg-white/5">
             {products.map((product) => {
               const isSurface = product.category === "floor" || product.category === "wall";
               const isAdded =
@@ -285,6 +288,9 @@ export function WorkspaceBuilder() {
                   <p className="mt-0.5 text-[10px] text-white/40">
                     {product.widthM} × {product.depthM} m
                   </p>
+                  <p className="mt-1 text-[10px] text-orange-200 tabular-nums">
+                    ${product.weeklyPrice}/week
+                  </p>
                   <button
                     type="button"
                     disabled={isAdded}
@@ -303,16 +309,34 @@ export function WorkspaceBuilder() {
           <IsoStage />
           <div className="pointer-events-none absolute top-4 left-4 rounded-2xl border border-white/10 bg-black/35 px-3 py-2 backdrop-blur-xl">
             <p className="flex items-center gap-1.5 text-[10px] tracking-[0.16em] text-orange-200 uppercase">
-              <Sparkles className="size-3" /> Phase one
+              <Sparkles className="size-3" /> Workspace controls
             </p>
-            <p className="mt-1 text-xs text-white/55">Drag items · scroll to zoom</p>
+            <p className="mt-1 text-xs text-white/55">
+              Drag items to arrange · Ctrl + scroll to zoom
+            </p>
           </div>
-          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-neutral-950/80 px-5 py-3 text-sm shadow-2xl backdrop-blur-xl">
-            <span className="font-semibold">Rent · ${total}/week</span>
-            <span className="ml-2 text-white/40">· {items.length}</span>
+          <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-4 rounded-full border border-white/10 bg-neutral-950/80 px-5 py-3 text-sm shadow-2xl backdrop-blur-xl">
+            <div>
+              <p className="text-[10px] font-medium tracking-[0.14em] text-white/45 uppercase">
+                Checkout summary
+              </p>
+              <p className="mt-0.5 font-semibold">
+                Rent · ${total}/week <span className="text-white/40">· {items.length}</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsCheckoutOpen(true)}
+              className="text-xs font-medium whitespace-nowrap text-orange-300 hover:text-orange-200 focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:outline-none"
+            >
+              Ready to rent? Click here
+            </button>
           </div>
         </section>
       </div>
+      {isCheckoutOpen && (
+        <CheckoutModal items={items} total={total} onClose={() => setIsCheckoutOpen(false)} />
+      )}
     </main>
   );
 }
