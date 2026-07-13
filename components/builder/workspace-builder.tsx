@@ -126,6 +126,7 @@ export function WorkspaceBuilder() {
   const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
   const items = useBuildStore((state) => state.items);
   const addItem = useBuildStore((state) => state.addItem);
+  const removeItem = useBuildStore((state) => state.removeItem);
   const swapDesk = useBuildStore((state) => state.swapDesk);
   const floorFinishId = useBuildStore((state) => state.floorFinishId);
   const wallFinishId = useBuildStore((state) => state.wallFinishId);
@@ -256,6 +257,8 @@ export function WorkspaceBuilder() {
                   : product.category === "wall"
                     ? wallFinishId === product.id
                     : items.some((item) => item.productId === product.id);
+              const placedItem = items.find((item) => item.productId === product.id);
+              const canRemove = Boolean(placedItem && !isSurface && !product.fixed);
               return (
                 <article
                   key={product.id}
@@ -295,14 +298,26 @@ export function WorkspaceBuilder() {
                   <p className="mt-1 text-[10px] text-orange-200 tabular-nums">
                     ${product.weeklyPrice}/week
                   </p>
-                  <button
-                    type="button"
-                    disabled={isAdded}
-                    onClick={() => addToWorkspace(product)}
-                    className="mt-3 min-h-9 w-full rounded-md border border-orange-300/30 bg-orange-500 px-2 py-1.5 text-[10px] leading-tight font-medium text-white transition hover:bg-orange-400 focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:outline-none disabled:cursor-default disabled:bg-orange-400/10 disabled:text-orange-100/45"
-                  >
-                    {isAdded ? "Added to Workspace" : "Add to Workspace"}
-                  </button>
+                  {canRemove ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (placedItem) removeItem(placedItem.instanceId);
+                      }}
+                      className="mt-3 min-h-9 w-full rounded-md border border-red-300/30 bg-red-500 px-2 py-1.5 text-[10px] leading-tight font-medium text-white transition hover:bg-red-400 focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:outline-none"
+                    >
+                      Remove from Workspace
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isAdded}
+                      onClick={() => addToWorkspace(product)}
+                      className="mt-3 min-h-9 w-full rounded-md border border-orange-300/30 bg-orange-500 px-2 py-1.5 text-[10px] leading-tight font-medium text-white transition hover:bg-orange-400 focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:outline-none disabled:cursor-default disabled:bg-orange-400/10 disabled:text-orange-100/45"
+                    >
+                      {isAdded ? "Added to Workspace" : "Add to Workspace"}
+                    </button>
+                  )}
                 </article>
               );
             })}
@@ -352,7 +367,12 @@ export function WorkspaceBuilder() {
         </section>
       </div>
       {isCheckoutOpen && (
-        <CheckoutModal items={items} total={total} onClose={() => setIsCheckoutOpen(false)} />
+        <CheckoutModal
+          items={items}
+          total={total}
+          onClose={() => setIsCheckoutOpen(false)}
+          onRemove={removeItem}
+        />
       )}
     </main>
   );

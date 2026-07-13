@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { PRODUCTS_BY_ID } from "@/lib/catalog";
 import type { PlacedItem } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,12 @@ export function CheckoutModal({
   items,
   total,
   onClose,
+  onRemove,
 }: {
   items: PlacedItem[];
   total: number;
   onClose: () => void;
+  onRemove: (instanceId: string) => void;
 }) {
   return (
     <div
@@ -65,6 +67,18 @@ export function CheckoutModal({
                   <span className="text-sm text-white/70 tabular-nums">
                     ${product.weeklyPrice}/week
                   </span>
+                  {!product.fixed && (
+                    <Button
+                      aria-label={`Remove ${product.name} from workspace`}
+                      title="Remove from workspace"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 border-red-300/25 text-red-200 hover:border-red-300/50 hover:bg-red-400/10 hover:text-red-100"
+                      onClick={() => onRemove(item.instanceId)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  )}
                 </li>
               );
             })}
