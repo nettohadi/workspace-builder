@@ -19,6 +19,7 @@
     "clsx": "latest",
     "lucide-react": "latest",
     "next": "latest",
+    "posthog-js": "^1.399.2",
     "react": "latest",
     "react-dom": "latest",
     "tailwind-merge": "latest",
