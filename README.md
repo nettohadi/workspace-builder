@@ -1,5 +1,7 @@
 # Monis Workspace Builder
 
+![Workspace Builder preview](./public/preview/preview.png)
+
 An interactive isometric workspace planner built with Next.js, React, Tailwind CSS, and Zustand.
 
 ## Prerequisites
