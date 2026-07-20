@@ -1,21 +1,25 @@
-import type { Product } from "@/lib/catalog";
+import type { DeskSurface, Product } from "@/lib/catalog";
 import type { FootprintCalibration } from "@/lib/store";
 import { footprintFor } from "@/components/scene/stage-helpers";
 import { CalibrationField } from "@/components/scene/calibration-field";
 
-const SHOW_FOOTPRINT_CALIBRATION = false;
+const SHOW_FOOTPRINT_CALIBRATION = true;
 
 export function ItemDetails({
   product,
   calibration,
+  deskSurface,
   isSelected,
   onCalibrationChange,
+  onDeskSurfaceChange,
   onCalibrate,
 }: {
   product: Product;
   calibration?: FootprintCalibration;
+  deskSurface: DeskSurface;
   isSelected: boolean;
   onCalibrationChange: (calibration: FootprintCalibration) => void;
+  onDeskSurfaceChange: (surface: DeskSurface) => void;
   onCalibrate: () => void;
 }) {
   const footprint = footprintFor(product);
@@ -33,6 +37,15 @@ export function ItemDetails({
     )
       return;
     onCalibrationChange({ ...currentCalibration, [key]: numericValue });
+  };
+  const updateDeskSurface = (key: keyof DeskSurface, value: string) => {
+    const numericValue = Number(value);
+    if (
+      !Number.isFinite(numericValue) ||
+      ((key === "widthM" || key === "depthM") && numericValue <= 0)
+    )
+      return;
+    onDeskSurfaceChange({ ...deskSurface, [key]: numericValue });
   };
   return (
     <aside className="absolute top-4 right-4 w-75 rounded-md border border-white/10 bg-neutral-950/85 p-3 shadow-2xl backdrop-blur-xl md:right-6">
@@ -56,8 +69,49 @@ export function ItemDetails({
           </p>
         </div>
       </div>
+      {SHOW_FOOTPRINT_CALIBRATION && isSelected && product.category === "desk" && (
+        <div className="mt-3 border-t border-white/10 pt-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[10px] font-medium tracking-[0.14em] text-orange-200 uppercase">
+              Desk placement surface
+            </p>
+            <button
+              type="button"
+              onClick={onCalibrate}
+              className="text-[10px] font-medium text-orange-300 hover:text-orange-200 focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:outline-none"
+            >
+              Show outline
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <CalibrationField
+              label="Width (m)"
+              value={deskSurface.depthM}
+              min={0.1}
+              onChange={(value) => updateDeskSurface("depthM", value)}
+            />
+            <CalibrationField
+              label="Depth (m)"
+              value={deskSurface.widthM}
+              min={0.1}
+              onChange={(value) => updateDeskSurface("widthM", value)}
+            />
+            <CalibrationField
+              label="Offset X (m)"
+              value={deskSurface.offsetXM}
+              onChange={(value) => updateDeskSurface("offsetXM", value)}
+            />
+            <CalibrationField
+              label="Offset Y (m)"
+              value={deskSurface.offsetYM}
+              onChange={(value) => updateDeskSurface("offsetYM", value)}
+            />
+          </div>
+        </div>
+      )}
       {SHOW_FOOTPRINT_CALIBRATION &&
         isSelected &&
+        product.category !== "desk" &&
         product.category !== "floor" &&
         product.category !== "wall" && (
           <div className="mt-3 border-t border-white/10 pt-3">

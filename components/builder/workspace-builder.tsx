@@ -33,8 +33,13 @@ const readyProductIds = new Set([
   "keyboard-apple-magic",
   "keyboard-wobkey-rainy-75",
   "computer-mac-mini-m4",
+  "apple-airpods-max",
+  "desk-lamp",
+  "mini-speaker",
   "plant-fiddle-leaf",
   "plant-snake-new",
+  "desk-plant-1",
+  "desk-plant-2",
   "painting-bauhaus-black",
   "painting-bauhaus-green",
   "clock-navy",
@@ -48,8 +53,8 @@ const categories: Category[] = [
   "keyboard",
   "mouse",
   "computer",
+  "accessories",
   "plant",
-  "decor",
 ];
 const STORAGE_KEY = "monis-workspace-builder:v1";
 
@@ -61,6 +66,7 @@ function savedBuildState(state: ReturnType<typeof useBuildStore.getState>) {
     panY: state.panY,
     floorFinishId: state.floorFinishId,
     wallFinishId: state.wallFinishId,
+    deskSurfaceCalibrations: state.deskSurfaceCalibrations,
     footprintCalibrations: state.footprintCalibrations,
     catalogFootprintVersion: 2,
   };
@@ -91,16 +97,23 @@ const placementSlots: Partial<Record<Category, Array<{ xM: number; yM: number }>
     { xM: 0.5, yM: 0.5 },
     { xM: 4.1, yM: 0.55 },
   ],
-  decor: [
-    { xM: 1.2, yM: 1.15 },
-    { xM: 3, yM: 1.1 },
-    { xM: 3.35, yM: 1.75 },
-  ],
+};
+
+const productPlacementSlots: Partial<Record<string, { xM: number; yM: number }>> = {
+  "apple-airpods-max": { xM: 8.0, yM: 15.4 },
+  "desk-lamp": { xM: 2.75, yM: 5.35 },
+  "mini-speaker": { xM: 0.62, yM: 0.55 },
+  "desk-plant-1": { xM: 0.18, yM: 0.55 },
+  "desk-plant-2": { xM: 0.72, yM: 0.28 },
+  "painting-bauhaus-black": { xM: 1.2, yM: 1.15 },
+  "painting-bauhaus-green": { xM: 3, yM: 1.1 },
+  "clock-navy": { xM: 3.35, yM: 1.75 },
 };
 
 function placementFor(product: Product, categoryCount: number) {
+  const productPlacement = productPlacementSlots[product.id];
   const slots = placementSlots[product.category] ?? [{ xM: 0, yM: 0 }];
-  const placement = slots[Math.min(categoryCount, slots.length - 1)];
+  const placement = productPlacement ?? slots[Math.min(categoryCount, slots.length - 1)];
   if (product.zone !== "desk") return placement;
 
   const footprintWidthM = product.footprintWidthM ?? product.widthM;

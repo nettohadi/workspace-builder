@@ -4,15 +4,15 @@ import { getItemPoint, hasFloorShadow, itemZIndex } from "@/components/scene/sta
 import type { DeskPose, DragPayload, Ghost } from "@/components/scene/stage-types";
 
 const stageItemBase =
-  "group absolute block cursor-grab origin-bottom border-0 bg-transparent p-0 transition-[filter] duration-200 ease-out [will-change:filter] active:cursor-grabbing motion-reduce:transition-none motion-reduce:[will-change:auto]";
+  "group absolute block cursor-grab origin-bottom border-0 bg-transparent p-0 transition-[filter,opacity] duration-150 ease-out active:cursor-grabbing motion-reduce:transition-none";
 const orangeHover =
-  "[filter:none] hover:[filter:drop-shadow(0_0_5px_rgba(251,146,60,0.75))] focus-visible:[filter:drop-shadow(0_0_5px_rgba(251,146,60,0.75))] focus-visible:outline-none";
+  "[filter:none] hover:[filter:drop-shadow(1px_0_0_rgba(251,146,60,0.95))_drop-shadow(-1px_0_0_rgba(251,146,60,0.95))_drop-shadow(0_1px_0_rgba(251,146,60,0.95))_drop-shadow(0_-1px_0_rgba(251,146,60,0.95))] focus-visible:[filter:drop-shadow(1px_0_0_rgba(251,146,60,0.95))_drop-shadow(-1px_0_0_rgba(251,146,60,0.95))_drop-shadow(0_1px_0_rgba(251,146,60,0.95))_drop-shadow(0_-1px_0_rgba(251,146,60,0.95))] focus-visible:outline-none";
 const floorShadow =
-  "[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))] hover:[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))_drop-shadow(0_0_5px_rgba(251,146,60,0.75))] focus-visible:[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))_drop-shadow(0_0_5px_rgba(251,146,60,0.75))] focus-visible:outline-none";
+  "[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))] hover:[filter:drop-shadow(1px_0_0_rgba(251,146,60,0.95))_drop-shadow(-1px_0_0_rgba(251,146,60,0.95))_drop-shadow(0_1px_0_rgba(251,146,60,0.95))_drop-shadow(0_-1px_0_rgba(251,146,60,0.95))_drop-shadow(0_12px_8px_rgba(0,0,0,0.35))] focus-visible:[filter:drop-shadow(1px_0_0_rgba(251,146,60,0.95))_drop-shadow(-1px_0_0_rgba(251,146,60,0.95))_drop-shadow(0_1px_0_rgba(251,146,60,0.95))_drop-shadow(0_-1px_0_rgba(251,146,60,0.95))_drop-shadow(0_12px_8px_rgba(0,0,0,0.35))] focus-visible:outline-none";
 const orangeSelected =
-  "[filter:drop-shadow(0_0_7px_rgba(251,146,60,0.95))] focus-visible:outline-none";
+  "[filter:drop-shadow(1px_0_0_rgba(251,146,60,0.95))_drop-shadow(-1px_0_0_rgba(251,146,60,0.95))_drop-shadow(0_1px_0_rgba(251,146,60,0.95))_drop-shadow(0_-1px_0_rgba(251,146,60,0.95))] focus-visible:outline-none";
 const floorSelected =
-  "[filter:drop-shadow(0_12px_8px_rgba(0,0,0,0.35))_drop-shadow(0_0_7px_rgba(251,146,60,0.95))] focus-visible:outline-none";
+  "[filter:drop-shadow(1px_0_0_rgba(251,146,60,0.95))_drop-shadow(-1px_0_0_rgba(251,146,60,0.95))_drop-shadow(0_1px_0_rgba(251,146,60,0.95))_drop-shadow(0_-1px_0_rgba(251,146,60,0.95))_drop-shadow(0_12px_8px_rgba(0,0,0,0.35))] focus-visible:outline-none";
 
 export function StageItem({
   item,

@@ -37,6 +37,23 @@ export function FootprintDebug({
           />
         );
       })}
+      {items.some((item) => item.instanceId === "desk") && (
+        <polygon
+          points={footprintPoints(
+            {
+              zone: "desk",
+              xM: 0,
+              yM: 0,
+              widthM: desk.widthM,
+              depthM: desk.depthM,
+            },
+            desk,
+          )}
+          className="fill-amber-300/12 stroke-amber-300"
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
       {ghost && (
         <polygon
           points={footprintPoints(

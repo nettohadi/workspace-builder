@@ -7,10 +7,17 @@ export type Category =
   | "keyboard"
   | "computer"
   | "headphones"
+  | "accessories"
   | "plant"
-  | "decor"
   | "floor"
   | "wall";
+
+export interface DeskSurface {
+  widthM: number;
+  depthM: number;
+  offsetXM: number;
+  offsetYM: number;
+}
 
 export interface Product {
   id: string;
@@ -34,6 +41,7 @@ export interface Product {
   rotateFootprint?: boolean;
   surfaceColor?: string;
   surfaceTexture?: string;
+  deskSurface?: DeskSurface;
   fixed?: boolean;
 }
 
@@ -160,7 +168,7 @@ export const PRODUCTS: Product[] = [
     category: "desk",
     variation: "Graphite",
     zone: "floor",
-    widthM: 2,
+    widthM: 2.35,
     depthM: 1,
     heightM: 0.75,
     weeklyPrice: 18,
@@ -169,9 +177,10 @@ export const PRODUCTS: Product[] = [
     displayHeight: 245,
     anchorX: 211,
     anchorY: 147,
-    footprintAnchorXM: 0.55,
-    footprintAnchorYM: 0.55,
+    footprintAnchorXM: 0.49,
+    footprintAnchorYM: 0.53,
     rotateFootprint: true,
+    deskSurface: { widthM: 1.14, depthM: 2.5, offsetXM: 0.25, offsetYM: 0.16 },
     fixed: true,
   }),
   product({
@@ -180,7 +189,7 @@ export const PRODUCTS: Product[] = [
     category: "desk",
     variation: "Oak",
     zone: "floor",
-    widthM: 2,
+    widthM: 2.35,
     depthM: 1,
     heightM: 0.75,
     weeklyPrice: 21,
@@ -189,11 +198,12 @@ export const PRODUCTS: Product[] = [
     displayHeight: 245,
     anchorX: 211,
     anchorY: 147,
-    footprintAnchorXM: 0.52,
-    footprintAnchorYM: 0.55,
+    footprintAnchorXM: 0.49,
+    footprintAnchorYM: 0.53,
     footprintWidthM: 2,
     footprintDepthM: 1,
     rotateFootprint: true,
+    deskSurface: { widthM: 1.14, depthM: 2.5, offsetXM: 0.25, offsetYM: 0.16 },
     fixed: true,
   }),
   product({
@@ -525,6 +535,101 @@ export const PRODUCTS: Product[] = [
     footprintAnchorYM: 0.43,
   }),
   product({
+    id: "apple-airpods-max",
+    name: "Apple AirPods Max",
+    category: "accessories",
+    variation: "Silver",
+    zone: "desk",
+    widthM: 0.28,
+    depthM: 0.22,
+    heightM: 0.26,
+    weeklyPrice: 8,
+    sprite: "/sprites/apple-airpods-max.png",
+    displayWidth: 80,
+    displayHeight: 80,
+    anchorX: 61,
+    anchorY: 104,
+    footprintAnchorXM: 0.63,
+    footprintAnchorYM: 0.39,
+    rotateFootprint: true,
+  }),
+  product({
+    id: "desk-lamp",
+    name: "Desk Lamp",
+    category: "accessories",
+    variation: "White",
+    zone: "desk",
+    widthM: 0.2,
+    depthM: 0.2,
+    heightM: 0.48,
+    weeklyPrice: 3,
+    sprite: "/sprites/desk-lamp.png",
+    displayWidth: 90,
+    displayHeight: 90,
+    anchorX: 42,
+    anchorY: 106,
+    footprintAnchorXM: 0.44,
+    footprintAnchorYM: 0.34,
+    rotateFootprint: true,
+  }),
+  product({
+    id: "mini-speaker",
+    name: "Mini Speaker",
+    category: "accessories",
+    variation: "White",
+    zone: "desk",
+    widthM: 0.24,
+    depthM: 0.24,
+    heightM: 0.2,
+    weeklyPrice: 4,
+    sprite: "/sprites/mini-speaker.png",
+    displayWidth: 65,
+    displayHeight: 65,
+    anchorX: 60,
+    anchorY: 107,
+    footprintAnchorXM: 0.88,
+    footprintAnchorYM: 0.53,
+    rotateFootprint: true,
+  }),
+  product({
+    id: "desk-plant-1",
+    name: "Bonsai Desk Plant",
+    category: "plant",
+    variation: "Bonsai",
+    zone: "desk",
+    widthM: 0.22,
+    depthM: 0.22,
+    heightM: 0.2,
+    weeklyPrice: 3,
+    sprite: "/sprites/desk-plant-1.png",
+    displayWidth: 80,
+    displayHeight: 80,
+    anchorX: 60,
+    anchorY: 98,
+    footprintAnchorXM: 0.63,
+    footprintAnchorYM: 0.39,
+    rotateFootprint: true,
+  }),
+  product({
+    id: "desk-plant-2",
+    name: "Succulent Desk Plant",
+    category: "plant",
+    variation: "Succulent",
+    zone: "desk",
+    widthM: 0.2,
+    depthM: 0.2,
+    heightM: 0.18,
+    weeklyPrice: 2,
+    sprite: "/sprites/desk-plant-2.png",
+    displayWidth: 80,
+    displayHeight: 80,
+    anchorX: 60,
+    anchorY: 93,
+    footprintAnchorXM: 0.63,
+    footprintAnchorYM: 0.39,
+    rotateFootprint: true,
+  }),
+  product({
     id: "plant-fiddle-leaf",
     name: "IKEA FEJKA Fiddle-Leaf Fig",
     category: "plant",
@@ -567,7 +672,7 @@ export const PRODUCTS: Product[] = [
   product({
     id: "painting-bauhaus-black",
     name: "Bauhaus 1923 Black Painting",
-    category: "decor",
+    category: "accessories",
     variation: "Black",
     zone: "wall-left",
     widthM: 0.6,
@@ -587,7 +692,7 @@ export const PRODUCTS: Product[] = [
   product({
     id: "painting-bauhaus-green",
     name: "Bauhaus Green Painting",
-    category: "decor",
+    category: "accessories",
     variation: "Green",
     zone: "wall-left",
     widthM: 0.6,
@@ -607,7 +712,7 @@ export const PRODUCTS: Product[] = [
   product({
     id: "clock-navy",
     name: "Navy Wall Clock",
-    category: "decor",
+    category: "accessories",
     variation: "Navy",
     zone: "wall-left",
     widthM: 0.7,

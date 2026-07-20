@@ -43,10 +43,12 @@ export function RoomSurfaces({
         }}
       />
       <div
-        className="pointer-events-none absolute h-[320px] w-[160px] origin-top-left"
+        className="pointer-events-none absolute origin-top-left"
         style={{
           left: projectFloor({ xM: desk.xM, yM: desk.yM, zM: desk.heightM }).x,
           top: projectFloor({ xM: desk.xM, yM: desk.yM, zM: desk.heightM }).y,
+          width: desk.widthM * 160,
+          height: desk.depthM * 160,
           transform: "matrix(.5, .25, -.5, .25, 0, 0)",
         }}
       />

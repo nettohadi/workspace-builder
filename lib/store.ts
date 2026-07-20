@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { PRODUCTS_BY_ID, type Zone } from "@/lib/catalog";
+import { PRODUCTS_BY_ID, type DeskSurface, type Zone } from "@/lib/catalog";
 
 export interface PlacedItem {
   instanceId: string;
@@ -23,6 +23,7 @@ interface BuildStore {
   panY: number;
   floorFinishId: string;
   wallFinishId: string;
+  deskSurfaceCalibrations: Record<string, DeskSurface>;
   footprintCalibrations: Record<string, FootprintCalibration>;
   setZoom: (zoom: number) => void;
   setPan: (panX: number, panY: number) => void;
@@ -33,13 +34,21 @@ interface BuildStore {
   swapDesk: (productId: string) => void;
   setFloorFinish: (productId: string) => void;
   setWallFinish: (productId: string) => void;
+  setDeskSurfaceCalibration: (productId: string, surface: DeskSurface) => void;
   setFootprintCalibration: (productId: string, calibration: FootprintCalibration) => void;
   hydrate: (state: Partial<PersistedBuildState>) => void;
 }
 
 export type PersistedBuildState = Pick<
   BuildStore,
-  "items" | "zoom" | "panX" | "panY" | "floorFinishId" | "wallFinishId" | "footprintCalibrations"
+  | "items"
+  | "zoom"
+  | "panX"
+  | "panY"
+  | "floorFinishId"
+  | "wallFinishId"
+  | "deskSurfaceCalibrations"
+  | "footprintCalibrations"
 > & {
   catalogFootprintVersion?: number;
 };
@@ -70,29 +79,29 @@ const initialItems: PlacedItem[] = [
     instanceId: "monitor-white-0ef96ac2-4876-4764-8e02-cf058b59a9a2",
     productId: "monitor-white",
     zone: "desk",
-    xM: 0.16,
-    yM: 0.8471069919817142,
+    xM: 0.2993548387096776,
+    yM: 1.2987198952075196,
   },
   {
     instanceId: "computer-mac-mini-m4-80d9074a-ce70-4061-93df-352f95f677ea",
     productId: "computer-mac-mini-m4",
     zone: "desk",
-    xM: 0.69,
-    yM: 0.8190259885757085,
+    xM: 0.8770967741935484,
+    yM: 1.2770905047047407,
   },
   {
     instanceId: "keyboard-apple-magic-a87533ec-4c4a-45ca-97b0-e6938cf68966",
     productId: "keyboard-apple-magic",
     zone: "desk",
-    xM: 0.7328367869153691,
-    yM: 0.7642963767826793,
+    xM: 0.9328367869153688,
+    yM: 1.2094576671052586,
   },
   {
     instanceId: "mouse-white-caa848a5-e0fa-4dd9-ab5f-d1de5ef0c58f",
     productId: "mouse-white",
     zone: "desk",
-    xM: 0.6504743239911157,
-    yM: 0.48099302121668797,
+    xM: 0.8311194852814381,
+    yM: 0.9971220534747527,
   },
   {
     instanceId: "chair-maroon-746a42b1-a035-4bf5-9837-4c2432039e1b",
@@ -122,6 +131,27 @@ const initialItems: PlacedItem[] = [
     xM: 1.5224969843184564,
     yM: 1.2931242460796135,
   },
+  {
+    instanceId: "apple-airpods-max-bed57342-d35d-46b5-b690-8f355846eb53",
+    productId: "apple-airpods-max",
+    zone: "desk",
+    xM: 0.9648387096774192,
+    yM: 2.5551612903225807,
+  },
+  {
+    instanceId: "mini-speaker-39465d6c-f22a-4a78-b238-6325544f008f",
+    productId: "mini-speaker",
+    zone: "desk",
+    xM: 1.0348387096774185,
+    yM: 0.9629032258064517,
+  },
+  {
+    instanceId: "desk-plant-2-1c4241a9-1075-4050-be6c-59ce3d2cd519",
+    productId: "desk-plant-2",
+    zone: "desk",
+    xM: 1.2812903225806456,
+    yM: 0.6545161290322583,
+  },
 ];
 
 export const useBuildStore = create<BuildStore>((set) => ({
@@ -131,6 +161,7 @@ export const useBuildStore = create<BuildStore>((set) => ({
   panY: 0,
   floorFinishId: "floor-oak",
   wallFinishId: "wall-greige",
+  deskSurfaceCalibrations: {},
   footprintCalibrations: {},
   setZoom: (zoom) => set({ zoom: Math.min(2.2, Math.max(0.6, zoom)) }),
   setPan: (panX, panY) => set({ panX, panY }),
@@ -165,6 +196,18 @@ export const useBuildStore = create<BuildStore>((set) => ({
     set((state) =>
       PRODUCTS_BY_ID[productId]?.category === "wall" ? { wallFinishId: productId } : state,
     ),
+  setDeskSurfaceCalibration: (productId, surface) =>
+    set((state) => ({
+      deskSurfaceCalibrations: {
+        ...state.deskSurfaceCalibrations,
+        [productId]: {
+          widthM: Math.max(0.1, surface.widthM),
+          depthM: Math.max(0.1, surface.depthM),
+          offsetXM: Number.isFinite(surface.offsetXM) ? surface.offsetXM : 0,
+          offsetYM: Number.isFinite(surface.offsetYM) ? surface.offsetYM : 0,
+        },
+      },
+    })),
   setFootprintCalibration: (productId, calibration) =>
     set((state) => ({
       footprintCalibrations: { ...state.footprintCalibrations, [productId]: calibration },
@@ -185,6 +228,23 @@ export const useBuildStore = create<BuildStore>((set) => ({
         saved.wallFinishId && PRODUCTS_BY_ID[saved.wallFinishId]?.category === "wall"
           ? saved.wallFinishId
           : state.wallFinishId,
+      deskSurfaceCalibrations:
+        saved.deskSurfaceCalibrations && typeof saved.deskSurfaceCalibrations === "object"
+          ? Object.fromEntries(
+              Object.entries(saved.deskSurfaceCalibrations).filter(
+                ([productId, surface]) =>
+                  PRODUCTS_BY_ID[productId]?.category === "desk" &&
+                  typeof surface === "object" &&
+                  surface !== null &&
+                  typeof surface.widthM === "number" &&
+                  typeof surface.depthM === "number" &&
+                  typeof surface.offsetXM === "number" &&
+                  typeof surface.offsetYM === "number" &&
+                  surface.widthM > 0 &&
+                  surface.depthM > 0,
+              ),
+            )
+          : state.deskSurfaceCalibrations,
       footprintCalibrations:
         saved.catalogFootprintVersion === 2 &&
         saved.footprintCalibrations &&

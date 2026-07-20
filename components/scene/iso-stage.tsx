@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus, RotateCcw, Scan } from "lucide-react";
-import { PRODUCTS_BY_ID, type Product, type Zone } from "@/lib/catalog";
+import { PRODUCTS_BY_ID, type Product } from "@/lib/catalog";
 import {
   anchoredFootprint,
   clamp,
@@ -22,21 +22,9 @@ import { StageItem } from "@/components/scene/stage-item";
 import { FootprintDebug } from "@/components/scene/footprint-debug";
 import { TrashOverlay } from "@/components/scene/trash-overlay";
 import { ItemDetails } from "@/components/scene/item-details";
+import { type DeskPose, type DragPayload, type Ghost } from "@/components/scene/stage-types";
 
 // The approved desk sprite's long edge follows floor axis Y, not floor axis X.
-const DESK = { widthM: 1, depthM: 2, heightM: 0.75 };
-type DeskPose = typeof DESK & { xM: number; yM: number };
-type DragPayload = { kind: "product"; id: string } | { kind: "instance"; id: string };
-type Ghost = {
-  zone: Zone;
-  xM: number;
-  yM: number;
-  footprintXM: number;
-  footprintYM: number;
-  widthM: number;
-  depthM: number;
-  valid: boolean;
-};
 
 function pointerToStage(event: { clientX: number; clientY: number }, stage: HTMLDivElement) {
   const rect = stage.getBoundingClientRect();
@@ -192,6 +180,7 @@ function candidateFor(
 export function IsoStage() {
   const viewportRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const dragImageRef = useRef<HTMLDivElement>(null);
   const [fitScale, setFitScale] = useState(1);
   const [drag, setDrag] = useState<DragPayload | null>(null);
   const [ghost, setGhost] = useState<Ghost | null>(null);
@@ -223,7 +212,9 @@ export function IsoStage() {
   const panY = useBuildStore((state) => state.panY);
   const floorFinishId = useBuildStore((state) => state.floorFinishId);
   const wallFinishId = useBuildStore((state) => state.wallFinishId);
+  const deskSurfaceCalibrations = useBuildStore((state) => state.deskSurfaceCalibrations);
   const footprintCalibrations = useBuildStore((state) => state.footprintCalibrations);
+  const setDeskSurfaceCalibration = useBuildStore((state) => state.setDeskSurfaceCalibration);
   const setFootprintCalibration = useBuildStore((state) => state.setFootprintCalibration);
   const setPan = useBuildStore((state) => state.setPan);
   const resetView = useBuildStore((state) => state.resetView);
@@ -244,17 +235,44 @@ export function IsoStage() {
     },
     [footprintCalibrations],
   );
+  const deskSurfaceFor = useCallback(
+    (product: Product) =>
+      deskSurfaceCalibrations[product.id] ??
+      product.deskSurface ?? { widthM: 1, depthM: 2, offsetXM: 0, offsetYM: 0 },
+    [deskSurfaceCalibrations],
+  );
+  const deskPoseFor = useCallback(
+    (xM: number, yM: number): DeskPose => {
+      const deskProduct = productForId(
+        items.find((item) => item.instanceId === "desk")?.productId ?? "desk-graphite",
+      );
+      const footprint = deskProduct ? collisionFootprintFor(deskProduct, xM, yM) : { xM, yM };
+      const deskSurface = deskProduct
+        ? deskSurfaceFor(deskProduct)
+        : { widthM: 1, depthM: 2, offsetXM: 0, offsetYM: 0 };
+      return {
+        widthM: deskSurface.widthM,
+        depthM: deskSurface.depthM,
+        heightM: deskProduct?.heightM ?? 0.75,
+        xM: footprint.xM + deskSurface.offsetXM,
+        yM: footprint.yM + deskSurface.offsetYM,
+      };
+    },
+    [deskSurfaceFor, items, productForId],
+  );
   const desk = useMemo<DeskPose>(() => {
     const deskItem = items.find((item) => item.instanceId === "desk");
-    return { ...DESK, xM: deskItem?.xM ?? 2.2, yM: deskItem?.yM ?? 0.85 };
-  }, [items]);
+    return deskPoseFor(deskItem?.xM ?? 2.2, deskItem?.yM ?? 0.85);
+  }, [deskPoseFor, items]);
   const renderDesk = useMemo<DeskPose>(() => {
     const isDraggingDesk = drag?.kind === "instance" && drag.id === "desk";
-    return isDraggingDesk && ghost ? { ...desk, xM: ghost.xM, yM: ghost.yM } : desk;
-  }, [desk, drag, ghost]);
+    return isDraggingDesk && ghost ? deskPoseFor(ghost.xM, ghost.yM) : desk;
+  }, [desk, deskPoseFor, drag, ghost]);
   const stageScale = fitScale * zoom;
   const inspectedItem = items.find((item) => item.instanceId === (hoveredId ?? selectedId));
   const inspectedProduct = inspectedItem ? productForId(inspectedItem.productId) : null;
+  const inspectedDeskSurface =
+    inspectedProduct?.category === "desk" ? deskSurfaceFor(inspectedProduct) : null;
   const hoveredItem = items.find((item) => item.instanceId === hoveredId);
 
   const showItemHover = useCallback((instanceId: string) => {
@@ -465,9 +483,7 @@ export function IsoStage() {
       payload.id,
     );
     event.dataTransfer.effectAllowed = payload.kind === "instance" ? "move" : "copy";
-    const transparent = new Image();
-    transparent.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-    event.dataTransfer.setDragImage(transparent, 0, 0);
+    if (dragImageRef.current) event.dataTransfer.setDragImage(dragImageRef.current, 0, 0);
   };
 
   const endDrag = () => {
@@ -589,6 +605,11 @@ export function IsoStage() {
       onPointerCancel={handleViewportPointerEnd}
     >
       <div
+        ref={dragImageRef}
+        className="pointer-events-none fixed -top-px -left-px size-px opacity-0"
+        aria-hidden="true"
+      />
+      <div
         className="absolute"
         style={{
           left: `calc(50% + ${panX}px)`,
@@ -664,10 +685,12 @@ export function IsoStage() {
         <ItemDetails
           product={inspectedProduct}
           calibration={footprintCalibrations[inspectedProduct.id]}
+          deskSurface={inspectedDeskSurface ?? { widthM: 1, depthM: 2, offsetXM: 0, offsetYM: 0 }}
           isSelected={selectedId === inspectedItem.instanceId}
           onCalibrationChange={(calibration) =>
             setFootprintCalibration(inspectedProduct.id, calibration)
           }
+          onDeskSurfaceChange={(surface) => setDeskSurfaceCalibration(inspectedProduct.id, surface)}
           onCalibrate={() => setShowFootprints(true)}
         />
       )}
