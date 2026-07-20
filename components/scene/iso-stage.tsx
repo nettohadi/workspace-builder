@@ -22,6 +22,7 @@ import { StageItem } from "@/components/scene/stage-item";
 import { FootprintDebug } from "@/components/scene/footprint-debug";
 import { TrashOverlay } from "@/components/scene/trash-overlay";
 import { ItemDetails } from "@/components/scene/item-details";
+import { SHOW_COLLISION_FOOTPRINT } from "@/lib/features";
 import { type DeskPose, type DragPayload, type Ghost } from "@/components/scene/stage-types";
 
 // The approved desk sprite's long edge follows floor axis Y, not floor axis X.
@@ -655,7 +656,7 @@ export function IsoStage() {
               onHoverEnd={scheduleItemHoverEnd}
             />
           ))}
-          {showFootprints && (
+          {SHOW_COLLISION_FOOTPRINT && showFootprints && (
             <FootprintDebug
               items={items}
               drag={drag}
@@ -724,17 +725,21 @@ export function IsoStage() {
         <span className="w-11 text-center text-[11px] text-white/60 tabular-nums">
           {Math.round(zoom * 100)}%
         </span>
-        <Button
-          aria-label="Show collision footprints"
-          aria-pressed={showFootprints}
-          title={showFootprints ? "Hide collision footprints" : "Show collision footprints"}
-          variant="ghost"
-          size="icon"
-          className={showFootprints ? "border-orange-300/60 bg-orange-300/15 text-orange-200" : ""}
-          onClick={() => setShowFootprints((visible) => !visible)}
-        >
-          <Scan className="size-4" />
-        </Button>
+        {SHOW_COLLISION_FOOTPRINT && (
+          <Button
+            aria-label="Show collision footprints"
+            aria-pressed={showFootprints}
+            title={showFootprints ? "Hide collision footprints" : "Show collision footprints"}
+            variant="ghost"
+            size="icon"
+            className={
+              showFootprints ? "border-orange-300/60 bg-orange-300/15 text-orange-200" : ""
+            }
+            onClick={() => setShowFootprints((visible) => !visible)}
+          >
+            <Scan className="size-4" />
+          </Button>
+        )}
         <Button aria-label="Reset view" variant="ghost" size="icon" onClick={resetView}>
           <RotateCcw className="size-4" />
         </Button>

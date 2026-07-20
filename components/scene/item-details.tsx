@@ -1,9 +1,8 @@
 import type { DeskSurface, Product } from "@/lib/catalog";
 import type { FootprintCalibration } from "@/lib/store";
+import { SHOW_COLLISION_FOOTPRINT } from "@/lib/features";
 import { footprintFor } from "@/components/scene/stage-helpers";
 import { CalibrationField } from "@/components/scene/calibration-field";
-
-const SHOW_FOOTPRINT_CALIBRATION = true;
 
 export function ItemDetails({
   product,
@@ -69,7 +68,7 @@ export function ItemDetails({
           </p>
         </div>
       </div>
-      {SHOW_FOOTPRINT_CALIBRATION && isSelected && product.category === "desk" && (
+      {SHOW_COLLISION_FOOTPRINT && isSelected && product.category === "desk" && (
         <div className="mt-3 border-t border-white/10 pt-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[10px] font-medium tracking-[0.14em] text-orange-200 uppercase">
@@ -109,7 +108,7 @@ export function ItemDetails({
           </div>
         </div>
       )}
-      {SHOW_FOOTPRINT_CALIBRATION &&
+      {SHOW_COLLISION_FOOTPRINT &&
         isSelected &&
         product.category !== "desk" &&
         product.category !== "floor" &&
